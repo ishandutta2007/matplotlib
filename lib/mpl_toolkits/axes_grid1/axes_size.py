@@ -1,12 +1,16 @@
 """
 Provides classes of simple units that will be used with `.AxesDivider`
 class (or others) to determine the size of each Axes. The unit
-classes define `get_size` method that returns a tuple of two floats,
+classes define `!get_size` method that returns a tuple of two floats,
 meaning relative and absolute sizes, respectively.
 
 Note that this class is nothing more than a simple tuple of two
 floats. Take a look at the Divider class to see how these two
 values are used.
+
+Once created, the unit classes can be modified by simple arithmetic
+operations: addition /subtraction with another unit type or a real number and scaling
+(multiplication or division) by a real number.
 """
 
 from numbers import Real
@@ -17,13 +21,32 @@ from matplotlib.axes import Axes
 
 class _Base:
     def __rmul__(self, other):
+        return self * other
+
+    def __mul__(self, other):
+        if not isinstance(other, Real):
+            return NotImplemented
         return Fraction(other, self)
+
+    def __div__(self, other):
+        return (1 / other) * self
 
     def __add__(self, other):
         if isinstance(other, _Base):
             return Add(self, other)
         else:
             return Add(self, Fixed(other))
+
+    def __neg__(self):
+        return -1 * self
+
+    def __radd__(self, other):
+        # other cannot be a _Base instance, because A + B would trigger
+        # A.__add__(B) first.
+        return Add(self, Fixed(other))
+
+    def __sub__(self, other):
+        return self + (-other)
 
     def get_size(self, renderer):
         """
@@ -233,14 +256,14 @@ class _AxesDecorationsSize(_Base):
     }
 
     def __init__(self, ax, direction):
-        self._get_size = _api.check_getitem(
-            self._get_size_map, direction=direction)
+        _api.check_in_list(self._get_size_map, direction=direction)
+        self._direction = direction
         self._ax_list = [ax] if isinstance(ax, Axes) else ax
 
     def get_size(self, renderer):
         sz = max([
-            self._get_size(ax.get_tightbbox(renderer, call_axes_locator=False),
-                           ax.bbox)
+            self._get_size_map[self._direction](
+                ax.get_tightbbox(renderer, call_axes_locator=False), ax.bbox)
             for ax in self._ax_list])
         dpi = renderer.points_to_pixels(72)
         abs_size = sz / dpi

@@ -30,7 +30,7 @@ fig, (ax0, ax1) = plt.subplots(2, 1, layout='constrained')
 ax0.plot(t, s)
 ax0.set_xlabel('Time (s)')
 ax0.set_ylabel('Signal')
-ax1.psd(s, 512, 1 / dt)
+ax1.psd(s, NFFT=512, Fs=1 / dt)
 
 plt.show()
 
@@ -178,3 +178,10 @@ ax1.grid(True)
 ax1.set_ylim(yrange)
 
 plt.show()
+
+# %%
+# .. tags::
+#
+#    domain: signal-processing
+#    plot-type: line
+#    level: intermediate

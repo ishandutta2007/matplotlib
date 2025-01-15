@@ -71,6 +71,7 @@ Annotating
    Figure.align_labels
    Figure.align_xlabels
    Figure.align_ylabels
+   Figure.align_titles
    Figure.autofmt_xdate
 
 
@@ -90,7 +91,7 @@ Figure geometry
    Figure.get_figwidth
    Figure.dpi
    Figure.set_dpi
-   Figure.set_dpi
+   Figure.get_dpi
 
 Subplot layout
 --------------
@@ -264,6 +265,7 @@ Annotating
    SubFigure.align_labels
    SubFigure.align_xlabels
    SubFigure.align_ylabels
+   SubFigure.align_titles
 
 Adding and getting Artists
 --------------------------

@@ -13,6 +13,7 @@ import subprocess
 import sys
 from tempfile import TemporaryDirectory, TemporaryFile
 import weakref
+import re
 
 import numpy as np
 from PIL import Image
@@ -300,7 +301,20 @@ def convert(filename, cache):
         convert = converter[path.suffix[1:]]
         if path.suffix == ".svg":
             contents = path.read_text()
-            if 'style="font:' in contents:
+            # NOTE: This check should be kept in sync with font styling in
+            # `lib/matplotlib/backends/backend_svg.py`. If it changes, then be sure to
+            # re-generate any SVG test files using this mode, or else such tests will
+            # fail to use the converter for the expected images (but will for the
+            # results), and the tests will fail strangely.
+            if re.search(
+                # searches for attributes :
+                #   style=[font|font-size|font-weight|
+                #          font-family|font-variant|font-style]
+                # taking care of the possibility of multiple style attributes
+                # before the font styling (i.e. opacity)
+                r'style="[^"]*font(|-size|-weight|-family|-variant|-style):',
+                contents  # raw contents of the svg file
+                    ):
                 # for svg.fonttype = none, we explicitly patch the font search
                 # path so that fonts shipped by Matplotlib are found.
                 convert = _svg_with_matplotlib_fonts_converter
@@ -383,7 +397,7 @@ def compare_images(expected, actual, tol, in_decorator=False):
     Compare two "image" files checking differences within a tolerance.
 
     The two given filenames may point to files which are convertible to
-    PNG via the `.converter` dictionary. The underlying RMS is calculated
+    PNG via the `!converter` dictionary. The underlying RMS is calculated
     with the `.calculate_rms` function.
 
     Parameters

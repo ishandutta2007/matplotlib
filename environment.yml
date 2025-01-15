@@ -2,8 +2,9 @@
 #
 #   conda env create -f environment.yml
 #   conda activate mpl-dev
-#   pip install -e .[dev]
+#   pip install --verbose --no-build-isolation --editable ".[dev]"
 #
+---
 name: mpl-dev
 channels:
   - conda-forge
@@ -15,14 +16,15 @@ dependencies:
   - fonttools>=4.22.0
   - importlib-resources>=3.2.0
   - kiwisolver>=1.3.1
+  - pybind11>=2.13.2
   - meson-python>=0.13.1
-  - numpy>=1.21
-  - pillow>=8
+  - numpy<2.1
+  - pillow>=9
   - pkg-config
-  - pybind11>=2.6.0
   - pygobject
   - pyparsing>=2.3.1
   - pyqt
+  - python>=3.10
   - python-dateutil>=2.1
   - setuptools_scm
   - wxpython
@@ -33,18 +35,23 @@ dependencies:
   - ipywidgets
   - numpydoc>=1.0
   - packaging>=20
-  - pydata-sphinx-theme~=0.13.1
+  - pydata-sphinx-theme~=0.15.0
   - pyyaml
   - sphinx>=3.0.0,!=6.1.2
   - sphinx-copybutton
   - sphinx-gallery>=0.12.0
+  - joblib  # needed for sphinx-gallery[parallel]
   - sphinx-design
+  - sphinx-tags>=0.4.0
+  - pystemmer
   - pip
   - pip:
       - mpl-sphinx-theme~=3.8.0
       - sphinxcontrib-svg2pdfconverter>=1.1.0
+      - sphinxcontrib-video>=0.2.1
       - pikepdf
   # testing
+  - black<24
   - coverage
   - flake8>=3.8
   - flake8-docstrings>=1.4.0
@@ -56,11 +63,11 @@ dependencies:
   - psutil
   - pre-commit
   - pydocstyle>=5.1.0
-  - pytest!=4.6.0,!=5.4.0
+  - pytest!=4.6.0,!=5.4.0,!=8.1.0
   - pytest-cov
   - pytest-rerunfailures
   - pytest-timeout
   - pytest-xdist
   - tornado
   - pytz
-  - black
+  - tox

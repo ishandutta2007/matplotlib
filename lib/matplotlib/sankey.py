@@ -138,7 +138,7 @@ class Sankey:
             raise ValueError(
                 "'tolerance' is negative, but it must be a magnitude")
 
-        # Create axes if necessary.
+        # Create Axes if necessary.
         if ax is None:
             import matplotlib.pyplot as plt
             fig = plt.figure()
@@ -347,7 +347,7 @@ class Sankey:
         # path[2] = path[2][::-1]
         # return path
 
-    @_docstring.dedent_interpd
+    @_docstring.interpd
     def add(self, patchlabel='', flows=None, orientations=None, labels='',
             trunklength=1.0, pathlengths=0.25, prior=None, connect=(0, 0),
             rotation=0, **kwargs):
@@ -777,7 +777,7 @@ class Sankey:
 
     def finish(self):
         """
-        Adjust the axes and return a list of information about the Sankey
+        Adjust the Axes and return a list of information about the Sankey
         subdiagram(s).
 
         Returns a list of subdiagrams with the following fields:
