@@ -1,6 +1,6 @@
 """
 The legend module defines the Legend class, which is responsible for
-drawing legends associated with axes and/or figures.
+drawing legends associated with Axes and/or figures.
 
 .. important::
 
@@ -12,7 +12,7 @@ drawing legends associated with axes and/or figures.
 The `Legend` class is a container of legend handles and legend texts.
 
 The legend handler map specifies how to create legend handles from artists
-(lines, patches, etc.) in the axes or figures. Default legend handlers are
+(lines, patches, etc.) in the Axes or figures. Default legend handlers are
 defined in the :mod:`~matplotlib.legend_handler` module. While not all artist
 types are covered by the default legend handlers, custom legend handlers can be
 defined to support arbitrary objects.
@@ -98,8 +98,8 @@ class DraggableLegend(DraggableOffsetBox):
 _legend_kw_doc_base = """
 bbox_to_anchor : `.BboxBase`, 2-tuple, or 4-tuple of floats
     Box that is used to position the legend in conjunction with *loc*.
-    Defaults to `axes.bbox` (if called as a method to `.Axes.legend`) or
-    `figure.bbox` (if `.Figure.legend`).  This argument allows arbitrary
+    Defaults to ``axes.bbox`` (if called as a method to `.Axes.legend`) or
+    ``figure.bbox`` (if ``figure.legend``).  This argument allows arbitrary
     placement of the legend.
 
     Bbox coordinates are interpreted in the coordinate system given by
@@ -109,13 +109,13 @@ bbox_to_anchor : `.BboxBase`, 2-tuple, or 4-tuple of floats
     If a 4-tuple or `.BboxBase` is given, then it specifies the bbox
     ``(x, y, width, height)`` that the legend is placed in.
     To put the legend in the best location in the bottom right
-    quadrant of the axes (or figure)::
+    quadrant of the Axes (or figure)::
 
         loc='best', bbox_to_anchor=(0.5, 0., 0.5, 0.5)
 
     A 2-tuple ``(x, y)`` places the corner of the legend specified by *loc* at
     x, y.  For example, to put the legend's upper right-hand corner in the
-    center of the axes (or figure) the following keywords can be used::
+    center of the Axes (or figure) the following keywords can be used::
 
         loc='upper right', bbox_to_anchor=(0.5, 0.5)
 
@@ -194,17 +194,17 @@ facecolor : "inherit" or color, default: :rc:`legend.facecolor`
 
 edgecolor : "inherit" or color, default: :rc:`legend.edgecolor`
     The legend's background patch edge color.
-    If ``"inherit"``, use take :rc:`axes.edgecolor`.
+    If ``"inherit"``, use :rc:`axes.edgecolor`.
 
 mode : {"expand", None}
     If *mode* is set to ``"expand"`` the legend will be horizontally
-    expanded to fill the axes area (or *bbox_to_anchor* if defines
+    expanded to fill the Axes area (or *bbox_to_anchor* if defines
     the legend's size).
 
 bbox_transform : None or `~matplotlib.transforms.Transform`
     The transform for the bounding box (*bbox_to_anchor*). For a value
     of ``None`` (default) the Axes'
-    :data:`~matplotlib.axes.Axes.transAxes` transform will be used.
+    :data:`!matplotlib.axes.Axes.transAxes` transform will be used.
 
 title : str or None
     The legend's title. Default is no title (``None``).
@@ -241,7 +241,7 @@ handletextpad : float, default: :rc:`legend.handletextpad`
     The pad between the legend handle and text, in font-size units.
 
 borderaxespad : float, default: :rc:`legend.borderaxespad`
-    The pad between the axes and legend border, in font-size units.
+    The pad between the Axes and legend border, in font-size units.
 
 columnspacing : float, default: :rc:`legend.columnspacing`
     The spacing between columns, in font-size units.
@@ -305,7 +305,7 @@ _legend_kw_axes_st = (
     _loc_doc_base.format(parent='axes', default=':rc:`legend.loc`',
                          best=_loc_doc_best, outside='') +
     _legend_kw_doc_base)
-_docstring.interpd.update(_legend_kw_axes=_legend_kw_axes_st)
+_docstring.interpd.register(_legend_kw_axes=_legend_kw_axes_st)
 
 _outside_doc = """
     If a figure is using the constrained layout manager, the string codes
@@ -323,20 +323,20 @@ _legend_kw_figure_st = (
     _loc_doc_base.format(parent='figure', default="'upper right'",
                          best='', outside=_outside_doc) +
     _legend_kw_doc_base)
-_docstring.interpd.update(_legend_kw_figure=_legend_kw_figure_st)
+_docstring.interpd.register(_legend_kw_figure=_legend_kw_figure_st)
 
 _legend_kw_both_st = (
     _loc_doc_base.format(parent='axes/figure',
                          default=":rc:`legend.loc` for Axes, 'upper right' for Figure",
                          best=_loc_doc_best, outside=_outside_doc) +
     _legend_kw_doc_base)
-_docstring.interpd.update(_legend_kw_doc=_legend_kw_both_st)
+_docstring.interpd.register(_legend_kw_doc=_legend_kw_both_st)
 
 _legend_kw_set_loc_st = (
     _loc_doc_base.format(parent='axes/figure',
                          default=":rc:`legend.loc` for Axes, 'upper right' for Figure",
                          best=_loc_doc_best, outside=_outside_doc))
-_docstring.interpd.update(_legend_kw_set_loc_doc=_legend_kw_set_loc_st)
+_docstring.interpd.register(_legend_kw_set_loc_doc=_legend_kw_set_loc_st)
 
 
 class Legend(Artist):
@@ -344,14 +344,14 @@ class Legend(Artist):
     Place a legend on the figure/axes.
     """
 
-    # 'best' is only implemented for axes legends
+    # 'best' is only implemented for Axes legends
     codes = {'best': 0, **AnchoredOffsetbox.codes}
     zorder = 5
 
     def __str__(self):
         return "Legend"
 
-    @_docstring.dedent_interpd
+    @_docstring.interpd
     def __init__(
         self, parent, handles, labels,
         *,
@@ -372,7 +372,7 @@ class Legend(Artist):
         handlelength=None,   # length of the legend handles
         handleheight=None,   # height of the legend handles
         handletextpad=None,  # pad between the legend handle and text
-        borderaxespad=None,  # pad between the axes and legend border
+        borderaxespad=None,  # pad between the Axes and legend border
         columnspacing=None,  # spacing between columns
 
         ncols=1,     # number of columns
@@ -454,24 +454,10 @@ class Legend(Artist):
         self.borderaxespad = mpl._val_or_rc(borderaxespad, 'legend.borderaxespad')
         self.columnspacing = mpl._val_or_rc(columnspacing, 'legend.columnspacing')
         self.shadow = mpl._val_or_rc(shadow, 'legend.shadow')
-        # trim handles and labels if illegal label...
-        _lab, _hand = [], []
-        for label, handle in zip(labels, handles):
-            if isinstance(label, str) and label.startswith('_'):
-                _api.warn_deprecated("3.8", message=(
-                    "An artist whose label starts with an underscore was passed to "
-                    "legend(); such artists will no longer be ignored in the future.  "
-                    "To suppress this warning, explicitly filter out such artists, "
-                    "e.g. with `[art for art in artists if not "
-                    "art.get_label().startswith('_')]`."))
-            else:
-                _lab.append(label)
-                _hand.append(handle)
-        labels, handles = _lab, _hand
 
         if reverse:
-            labels.reverse()
-            handles.reverse()
+            labels = [*reversed(labels)]
+            handles = [*reversed(handles)]
 
         if len(handles) < 2:
             ncols = 1
@@ -497,7 +483,7 @@ class Legend(Artist):
         if isinstance(parent, Axes):
             self.isaxes = True
             self.axes = parent
-            self.set_figure(parent.figure)
+            self.set_figure(parent.get_figure(root=False))
         elif isinstance(parent, FigureBase):
             self.isaxes = False
             self.set_figure(parent)
@@ -595,9 +581,8 @@ class Legend(Artist):
             'markeredgecolor': ['get_markeredgecolor', 'get_edgecolor'],
             'mec':             ['get_markeredgecolor', 'get_edgecolor'],
         }
-        labelcolor = mpl._val_or_rc(labelcolor, 'legend.labelcolor')
-        if labelcolor is None:
-            labelcolor = mpl.rcParams['text.color']
+        labelcolor = mpl._val_or_rc(mpl._val_or_rc(labelcolor, 'legend.labelcolor'),
+                                    'text.color')
         if isinstance(labelcolor, str) and labelcolor in color_getters:
             getter_names = color_getters[labelcolor]
             for handle, text in zip(self.legend_handles, self.texts):
@@ -633,20 +618,17 @@ class Legend(Artist):
         else:
             raise ValueError(f"Invalid labelcolor: {labelcolor!r}")
 
-    legendHandles = _api.deprecated('3.7', alternative="legend_handles")(
-        property(lambda self: self.legend_handles))
-
     def _set_artist_props(self, a):
         """
-        Set the boilerplate props for artists added to axes.
+        Set the boilerplate props for artists added to Axes.
         """
-        a.set_figure(self.figure)
+        a.set_figure(self.get_figure(root=False))
         if self.isaxes:
             a.axes = self.axes
 
         a.set_transform(self.get_transform())
 
-    @_docstring.dedent_interpd
+    @_docstring.interpd
     def set_loc(self, loc=None):
         """
         Set the location of the legend.
@@ -946,12 +928,12 @@ class Legend(Artist):
                                    align=self._alignment,
                                    children=[self._legend_title_box,
                                              self._legend_handle_box])
-        self._legend_box.set_figure(self.figure)
+        self._legend_box.set_figure(self.get_figure(root=False))
         self._legend_box.axes = self.axes
         self.texts = text_list
         self.legend_handles = handle_list
 
-    def _auto_legend_data(self):
+    def _auto_legend_data(self, renderer):
         """
         Return display coordinates for hit testing for "best" positioning.
 
@@ -978,11 +960,15 @@ class Legend(Artist):
             elif isinstance(artist, Patch):
                 lines.append(
                     artist.get_transform().transform_path(artist.get_path()))
+            elif isinstance(artist, PolyCollection):
+                lines.extend(artist.get_transform().transform_path(path)
+                             for path in artist.get_paths())
             elif isinstance(artist, Collection):
                 transform, transOffset, hoffsets, _ = artist._prepare_points()
                 if len(hoffsets):
-                    for offset in transOffset.transform(hoffsets):
-                        offsets.append(offset)
+                    offsets.extend(transOffset.transform(hoffsets))
+            elif isinstance(artist, Text):
+                bboxes.append(artist.get_window_extent(renderer))
 
         return bboxes, lines, offsets
 
@@ -1064,7 +1050,7 @@ class Legend(Artist):
     def get_window_extent(self, renderer=None):
         # docstring inherited
         if renderer is None:
-            renderer = self.figure._get_renderer()
+            renderer = self.get_figure(root=True)._get_renderer()
         return self._legend_box.get_window_extent(renderer=renderer)
 
     def get_tightbbox(self, renderer=None):
@@ -1163,7 +1149,7 @@ class Legend(Artist):
 
         start_time = time.perf_counter()
 
-        bboxes, lines, offsets = self._auto_legend_data()
+        bboxes, lines, offsets = self._auto_legend_data(renderer)
 
         bbox = Bbox.from_bounds(0, 0, width, height)
 
@@ -1195,7 +1181,6 @@ class Legend(Artist):
 
         return l, b
 
-    @_api.rename_parameter("3.8", "event", "mouseevent")
     def contains(self, mouseevent):
         return self.legendPatch.contains(mouseevent)
 
@@ -1248,7 +1233,7 @@ def _get_legend_handles(axs, legend_handler_map=None):
             *(a for a in ax._children
               if isinstance(a, (Line2D, Patch, Collection, Text))),
             *ax.containers]
-        # support parasite axes:
+        # support parasite Axes:
         if hasattr(ax, 'parasites'):
             for axx in ax.parasites:
                 handles_original += [
@@ -1301,7 +1286,7 @@ def _parse_legend_args(axs, *args, handles=None, labels=None, **kwargs):
         legend(handles=handles, labels=labels)
 
     The behavior for a mixture of positional and keyword handles and labels
-    is undefined and issues a warning.
+    is undefined and issues a warning; it will be an error in the future.
 
     Parameters
     ----------
@@ -1334,8 +1319,10 @@ def _parse_legend_args(axs, *args, handles=None, labels=None, **kwargs):
     handlers = kwargs.get('handler_map')
 
     if (handles is not None or labels is not None) and args:
-        _api.warn_external("You have mixed positional and keyword arguments, "
-                           "some input may be discarded.")
+        _api.warn_deprecated("3.9", message=(
+            "You have mixed positional and keyword arguments, some input may "
+            "be discarded.  This is deprecated since %(since)s and will "
+            "become an error in %(removal)s."))
 
     if (hasattr(handles, "__len__") and
             hasattr(labels, "__len__") and
@@ -1358,7 +1345,7 @@ def _parse_legend_args(axs, *args, handles=None, labels=None, **kwargs):
     elif len(args) == 0:  # 0 args: automatically detect labels and handles.
         handles, labels = _get_legend_handles_labels(axs, handlers)
         if not handles:
-            log.warning(
+            _api.warn_external(
                 "No artists with labels found to put in legend.  Note that "
                 "artists whose label start with an underscore are ignored "
                 "when legend() is called with no argument.")

@@ -168,7 +168,7 @@ def _mark_every_path(markevery, tpath, affine, ax):
                     f'markevery={markevery}')
             if ax is None:
                 raise ValueError(
-                    "markevery is specified relative to the axes size, but "
+                    "markevery is specified relative to the Axes size, but "
                     "the line does not have a Axes as parent")
 
             # calc cumulative distance along path (in display coords):
@@ -180,7 +180,7 @@ def _mark_every_path(markevery, tpath, affine, ax):
             delta[0, :] = 0
             delta[1:, :] = disp_coords[1:, :] - disp_coords[:-1, :]
             delta = np.hypot(*delta.T).cumsum()
-            # calc distance between markers along path based on the axes
+            # calc distance between markers along path based on the Axes
             # bounding box diagonal being a distance of unity:
             (x0, y0), (x1, y1) = ax.transAxes.transform([[0, 0], [1, 1]])
             scale = np.hypot(x1 - x0, y1 - y0)
@@ -327,28 +327,16 @@ class Line2D(Artist):
         if not np.iterable(ydata):
             raise RuntimeError('ydata must be a sequence')
 
-        if linewidth is None:
-            linewidth = mpl.rcParams['lines.linewidth']
-
-        if linestyle is None:
-            linestyle = mpl.rcParams['lines.linestyle']
-        if marker is None:
-            marker = mpl.rcParams['lines.marker']
-        if color is None:
-            color = mpl.rcParams['lines.color']
-
-        if markersize is None:
-            markersize = mpl.rcParams['lines.markersize']
-        if antialiased is None:
-            antialiased = mpl.rcParams['lines.antialiased']
-        if dash_capstyle is None:
-            dash_capstyle = mpl.rcParams['lines.dash_capstyle']
-        if dash_joinstyle is None:
-            dash_joinstyle = mpl.rcParams['lines.dash_joinstyle']
-        if solid_capstyle is None:
-            solid_capstyle = mpl.rcParams['lines.solid_capstyle']
-        if solid_joinstyle is None:
-            solid_joinstyle = mpl.rcParams['lines.solid_joinstyle']
+        linewidth = mpl._val_or_rc(linewidth, 'lines.linewidth')
+        linestyle = mpl._val_or_rc(linestyle, 'lines.linestyle')
+        marker = mpl._val_or_rc(marker, 'lines.marker')
+        color = mpl._val_or_rc(color, 'lines.color')
+        markersize = mpl._val_or_rc(markersize, 'lines.markersize')
+        antialiased = mpl._val_or_rc(antialiased, 'lines.antialiased')
+        dash_capstyle = mpl._val_or_rc(dash_capstyle, 'lines.dash_capstyle')
+        dash_joinstyle = mpl._val_or_rc(dash_joinstyle, 'lines.dash_joinstyle')
+        solid_capstyle = mpl._val_or_rc(solid_capstyle, 'lines.solid_capstyle')
+        solid_joinstyle = mpl._val_or_rc(solid_joinstyle, 'lines.solid_joinstyle')
 
         if drawstyle is None:
             drawstyle = 'default'
@@ -467,11 +455,12 @@ class Line2D(Artist):
         yt = xy[:, 1]
 
         # Convert pick radius from points to pixels
-        if self.figure is None:
+        fig = self.get_figure(root=True)
+        if fig is None:
             _log.warning('no figure set when check if mouse is on line')
             pixels = self._pickradius
         else:
-            pixels = self.figure.dpi / 72. * self._pickradius
+            pixels = fig.dpi / 72. * self._pickradius
 
         # The math involved in checking for containment (here and inside of
         # segment_hits) assumes that it is OK to overflow, so temporarily set
@@ -575,7 +564,7 @@ class Line2D(Artist):
             - ``every=0.1``, (i.e. a float): markers will be spaced at
               approximately equal visual distances along the line; the distance
               along the line between markers is determined by multiplying the
-              display-coordinate distance of the axes bounding-box diagonal
+              display-coordinate distance of the Axes bounding-box diagonal
               by the value of *every*.
             - ``every=(0.5, 0.1)`` (i.e. a length-2 tuple of float): similar
               to ``every=0.1`` but the first marker will be offset along the
@@ -640,7 +629,7 @@ class Line2D(Artist):
                                  ignore=True)
         # correct for marker size, if any
         if self._marker:
-            ms = (self._markersize / 72.0 * self.figure.dpi) * 0.5
+            ms = (self._markersize / 72.0 * self.get_figure(root=True).dpi) * 0.5
             bbox = bbox.padded(ms)
         return bbox
 
@@ -651,6 +640,11 @@ class Line2D(Artist):
         Parameters
         ----------
         *args : (2, N) array or two 1D arrays
+
+        See Also
+        --------
+        set_xdata
+        set_ydata
         """
         if len(args) == 1:
             (x, y), = args
@@ -1056,7 +1050,7 @@ class Line2D(Artist):
 
         Parameters
         ----------
-        color : color
+        color : :mpltype:`color`
         """
         mcolors._check_color_like(color=color)
         self._color = color
@@ -1111,7 +1105,7 @@ class Line2D(Artist):
 
         Parameters
         ----------
-        gapcolor : color or None
+        gapcolor : :mpltype:`color` or None
             The color with which to fill the gaps. If None, the gaps are
             unfilled.
         """
@@ -1146,15 +1140,15 @@ class Line2D(Artist):
 
             - A string:
 
-              ==========================================  =================
-              linestyle                                   description
-              ==========================================  =================
-              ``'-'`` or ``'solid'``                      solid line
-              ``'--'`` or  ``'dashed'``                   dashed line
-              ``'-.'`` or  ``'dashdot'``                  dash-dotted line
-              ``':'`` or ``'dotted'``                     dotted line
-              ``'none'``, ``'None'``, ``' '``, or ``''``  draw nothing
-              ==========================================  =================
+              =======================================================  ================
+              linestyle                                                description
+              =======================================================  ================
+              ``'-'`` or ``'solid'``                                   solid line
+              ``'--'`` or ``'dashed'``                                 dashed line
+              ``'-.'`` or ``'dashdot'``                                dash-dotted line
+              ``':'`` or ``'dotted'``                                  dotted line
+              ``''`` or ``'none'`` (discouraged: ``'None'``, ``' '``)  draw nothing
+              =======================================================  ================
 
             - Alternatively a dash tuple of the following form can be
               provided::
@@ -1214,7 +1208,7 @@ class Line2D(Artist):
 
         Parameters
         ----------
-        ec : color
+        ec : :mpltype:`color`
         """
         self._set_markercolor("markeredgecolor", True, ec)
 
@@ -1224,7 +1218,7 @@ class Line2D(Artist):
 
         Parameters
         ----------
-        fc : color
+        fc : :mpltype:`color`
         """
         self._set_markercolor("markerfacecolor", True, fc)
 
@@ -1234,7 +1228,7 @@ class Line2D(Artist):
 
         Parameters
         ----------
-        fc : color
+        fc : :mpltype:`color`
         """
         self._set_markercolor("markerfacecoloralt", False, fc)
 
@@ -1247,8 +1241,7 @@ class Line2D(Artist):
         ew : float
              Marker edge width, in points.
         """
-        if ew is None:
-            ew = mpl.rcParams['lines.markeredgewidth']
+        ew = mpl._val_or_rc(ew, 'lines.markeredgewidth')
         if self._markeredgewidth != ew:
             self.stale = True
         self._markeredgewidth = ew
@@ -1274,6 +1267,11 @@ class Line2D(Artist):
         Parameters
         ----------
         x : 1D array
+
+        See Also
+        --------
+        set_data
+        set_ydata
         """
         if not np.iterable(x):
             raise RuntimeError('x must be a sequence')
@@ -1288,6 +1286,11 @@ class Line2D(Artist):
         Parameters
         ----------
         y : 1D array
+
+        See Also
+        --------
+        set_data
+        set_xdata
         """
         if not np.iterable(y):
             raise RuntimeError('y must be a sequence')
@@ -1338,7 +1341,6 @@ class Line2D(Artist):
         self._solidcapstyle = other._solidcapstyle
         self._solidjoinstyle = other._solidjoinstyle
 
-        self._linestyle = other._linestyle
         self._marker = MarkerStyle(marker=other._marker)
         self._drawstyle = other._drawstyle
 
@@ -1464,9 +1466,10 @@ class AxLine(Line2D):
             The first set of (x, y) coordinates for the line to pass through.
         xy2 : (float, float) or None
             The second set of (x, y) coordinates for the line to pass through.
-            Either *xy2* or *slope* has to be given.
+            Both *xy2* and *slope* must be passed, but one of them must be None.
         slope : float or None
-            The slope of the line. Either *xy2* or *slope* has to be given.
+            The slope of the line. Both *xy2* and *slope* must be passed, but one of
+            them must be None.
         """
         super().__init__([0, 1], [0, 1], **kwargs)
 
@@ -1489,8 +1492,8 @@ class AxLine(Line2D):
                 points_transform.transform([self._xy1, self._xy2])
             dx = x2 - x1
             dy = y2 - y1
-            if np.allclose(x1, x2):
-                if np.allclose(y1, y2):
+            if dx == 0:
+                if dy == 0:
                     raise ValueError(
                         f"Cannot draw a line through two identical points "
                         f"(x={(x1, x2)}, y={(y1, y2)})")
@@ -1504,7 +1507,7 @@ class AxLine(Line2D):
         (vxlo, vylo), (vxhi, vyhi) = ax.transScale.transform(ax.viewLim)
         # General case: find intersections with view limits in either
         # direction, and draw between the middle two points.
-        if np.isclose(slope, 0):
+        if slope == 0:
             start = vxlo, y1
             stop = vxhi, y1
         elif np.isinf(slope):
@@ -1525,45 +1528,65 @@ class AxLine(Line2D):
         super().draw(renderer)
 
     def get_xy1(self):
-        """
-        Return the *xy1* value of the line.
-        """
+        """Return the *xy1* value of the line."""
         return self._xy1
 
     def get_xy2(self):
-        """
-        Return the *xy2* value of the line.
-        """
+        """Return the *xy2* value of the line."""
         return self._xy2
 
     def get_slope(self):
-        """
-        Return the *slope* value of the line.
-        """
+        """Return the *slope* value of the line."""
         return self._slope
 
-    def set_xy1(self, x, y):
+    def set_xy1(self, *args, **kwargs):
         """
         Set the *xy1* value of the line.
 
         Parameters
         ----------
-        x, y : float
+        xy1 : tuple[float, float]
             Points for the line to pass through.
         """
-        self._xy1 = x, y
+        params = _api.select_matching_signature([
+            lambda self, x, y: locals(), lambda self, xy1: locals(),
+        ], self, *args, **kwargs)
+        if "x" in params:
+            _api.warn_deprecated("3.10", message=(
+                "Passing x and y separately to AxLine.set_xy1 is deprecated since "
+                "%(since)s; pass them as a single tuple instead."))
+            xy1 = params["x"], params["y"]
+        else:
+            xy1 = params["xy1"]
+        self._xy1 = xy1
 
-    def set_xy2(self, x, y):
+    def set_xy2(self, *args, **kwargs):
         """
         Set the *xy2* value of the line.
 
+        .. note::
+
+            You can only set *xy2* if the line was created using the *xy2*
+            parameter. If the line was created using *slope*, please use
+            `~.AxLine.set_slope`.
+
         Parameters
         ----------
-        x, y : float
+        xy2 : tuple[float, float]
             Points for the line to pass through.
         """
         if self._slope is None:
-            self._xy2 = x, y
+            params = _api.select_matching_signature([
+                lambda self, x, y: locals(), lambda self, xy2: locals(),
+            ], self, *args, **kwargs)
+            if "x" in params:
+                _api.warn_deprecated("3.10", message=(
+                    "Passing x and y separately to AxLine.set_xy2 is deprecated since "
+                    "%(since)s; pass them as a single tuple instead."))
+                xy2 = params["x"], params["y"]
+            else:
+                xy2 = params["xy2"]
+            self._xy2 = xy2
         else:
             raise ValueError("Cannot set an 'xy2' value while 'slope' is set;"
                              " they differ but their functionalities overlap")
@@ -1571,6 +1594,12 @@ class AxLine(Line2D):
     def set_slope(self, slope):
         """
         Set the *slope* value of the line.
+
+        .. note::
+
+            You can only set *slope* if the line was created using the *slope*
+            parameter. If the line was created using *xy2*, please use
+            `~.AxLine.set_xy2`.
 
         Parameters
         ----------
@@ -1632,7 +1661,7 @@ class VertexSelector:
             'pick_event', self.onpick)
         self.ind = set()
 
-    canvas = property(lambda self: self.axes.figure.canvas)
+    canvas = property(lambda self: self.axes.get_figure(root=True).canvas)
 
     def process_selected(self, ind, xs, ys):
         """

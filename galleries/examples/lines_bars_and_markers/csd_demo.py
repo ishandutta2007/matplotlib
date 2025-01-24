@@ -34,7 +34,14 @@ ax1.set_xlabel('Time (s)')
 ax1.set_ylabel('s1 and s2')
 ax1.grid(True)
 
-cxy, f = ax2.csd(s1, s2, 256, 1. / dt)
+cxy, f = ax2.csd(s1, s2, NFFT=256, Fs=1. / dt)
 ax2.set_ylabel('CSD (dB)')
 
 plt.show()
+
+# %%
+# .. tags::
+#
+#    domain: signal-processing
+#    plot-type: line
+#    level: beginner

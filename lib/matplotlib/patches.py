@@ -56,6 +56,7 @@ class Patch(artist.Artist):
                  fill=True,
                  capstyle=None,
                  joinstyle=None,
+                 hatchcolor=None,
                  **kwargs):
         """
         The following kwarg properties are supported
@@ -71,7 +72,7 @@ class Patch(artist.Artist):
         if joinstyle is None:
             joinstyle = JoinStyle.miter
 
-        self._hatch_color = colors.to_rgba(mpl.rcParams['hatch.color'])
+        self._hatch_linewidth = mpl.rcParams['hatch.linewidth']
         self._fill = bool(fill)  # needed for set_facecolor call
         if color is not None:
             if edgecolor is not None or facecolor is not None:
@@ -81,6 +82,7 @@ class Patch(artist.Artist):
             self.set_color(color)
         else:
             self.set_edgecolor(edgecolor)
+            self.set_hatchcolor(hatchcolor)
             self.set_facecolor(facecolor)
 
         self._linewidth = 0
@@ -127,6 +129,29 @@ class Patch(artist.Artist):
         """
         Test whether the mouse event occurred in the patch.
 
+        Parameters
+        ----------
+        mouseevent : `~matplotlib.backend_bases.MouseEvent`
+            Where the user clicked.
+
+        radius : float, optional
+            Additional margin on the patch in target coordinates of
+            `.Patch.get_transform`. See `.Path.contains_point` for further
+            details.
+
+            If `None`, the default value depends on the state of the object:
+
+            - If `.Artist.get_picker` is a number, the default
+              is that value.  This is so that picking works as expected.
+            - Otherwise if the edge color has a non-zero alpha, the default
+              is half of the linewidth.  This is so that all the colored
+              pixels are "in" the patch.
+            - Finally, if the edge has 0 alpha, the default is 0.  This is
+              so that patches without a stroked edge do not have points
+              outside of the filled region report as "in" due to an
+              invisible edge.
+
+
         Returns
         -------
         (bool, empty dict)
@@ -160,12 +185,24 @@ class Patch(artist.Artist):
         ----------
         point : (float, float)
             The point (x, y) to check, in target coordinates of
-            ``self.get_transform()``. These are display coordinates for patches
-            that are added to a figure or axes.
+            ``.Patch.get_transform()``. These are display coordinates for patches
+            that are added to a figure or Axes.
         radius : float, optional
             Additional margin on the patch in target coordinates of
-            ``self.get_transform()``. See `.Path.contains_point` for further
+            `.Patch.get_transform`. See `.Path.contains_point` for further
             details.
+
+            If `None`, the default value depends on the state of the object:
+
+            - If `.Artist.get_picker` is a number, the default
+              is that value.  This is so that picking works as expected.
+            - Otherwise if the edge color has a non-zero alpha, the default
+              is half of the linewidth.  This is so that all the colored
+              pixels are "in" the patch.
+            - Finally, if the edge has 0 alpha, the default is 0.  This is
+              so that patches without a stroked edge do not have points
+              outside of the filled region report as "in" due to an
+              invisible edge.
 
         Returns
         -------
@@ -190,10 +227,10 @@ class Patch(artist.Artist):
         transform them first:
 
         >>> center = 0, 0
-        >>> c = Circle(center, radius=1)
+        >>> c = Circle(center, radius=3)
         >>> plt.gca().add_patch(c)
-        >>> transformed_center = c.get_transform().transform(center)
-        >>> c.contains_point(transformed_center)
+        >>> transformed_interior_point = c.get_data_transform().transform((0, 2))
+        >>> c.contains_point(transformed_interior_point)
         True
 
         """
@@ -211,11 +248,23 @@ class Patch(artist.Artist):
         points : (N, 2) array
             The points to check, in target coordinates of
             ``self.get_transform()``. These are display coordinates for patches
-            that are added to a figure or axes. Columns contain x and y values.
+            that are added to a figure or Axes. Columns contain x and y values.
         radius : float, optional
             Additional margin on the patch in target coordinates of
-            ``self.get_transform()``. See `.Path.contains_point` for further
+            `.Patch.get_transform`. See `.Path.contains_point` for further
             details.
+
+            If `None`, the default value depends on the state of the object:
+
+            - If `.Artist.get_picker` is a number, the default
+              is that value.  This is so that picking works as expected.
+            - Otherwise if the edge color has a non-zero alpha, the default
+              is half of the linewidth.  This is so that all the colored
+              pixels are "in" the patch.
+            - Finally, if the edge has 0 alpha, the default is 0.  This is
+              so that patches without a stroked edge do not have points
+              outside of the filled region report as "in" due to an
+              invisible edge.
 
         Returns
         -------
@@ -243,6 +292,7 @@ class Patch(artist.Artist):
         self._fill = other._fill
         self._hatch = other._hatch
         self._hatch_color = other._hatch_color
+        self._original_hatchcolor = other._original_hatchcolor
         self._unscaled_dash_pattern = other._unscaled_dash_pattern
         self.set_linewidth(other._linewidth)  # also sets scaled dashes
         self.set_transform(other.get_data_transform())
@@ -290,6 +340,14 @@ class Patch(artist.Artist):
         """Return the face color."""
         return self._facecolor
 
+    def get_hatchcolor(self):
+        """Return the hatch color."""
+        if self._hatch_color == 'edge':
+            if self._edgecolor[3] == 0:  # fully transparent
+                return colors.to_rgba(mpl.rcParams['patch.edgecolor'])
+            return self.get_edgecolor()
+        return self._hatch_color
+
     def get_linewidth(self):
         """Return the line width in points."""
         return self._linewidth
@@ -306,24 +364,18 @@ class Patch(artist.Artist):
         ----------
         aa : bool or None
         """
-        if aa is None:
-            aa = mpl.rcParams['patch.antialiased']
-        self._antialiased = aa
+        self._antialiased = mpl._val_or_rc(aa, 'patch.antialiased')
         self.stale = True
 
     def _set_edgecolor(self, color):
-        set_hatch_color = True
         if color is None:
             if (mpl.rcParams['patch.force_edgecolor'] or
                     not self._fill or self._edge_default):
                 color = mpl.rcParams['patch.edgecolor']
             else:
                 color = 'none'
-                set_hatch_color = False
 
         self._edgecolor = colors.to_rgba(color, self._alpha)
-        if set_hatch_color:
-            self._hatch_color = self._edgecolor
         self.stale = True
 
     def set_edgecolor(self, color):
@@ -332,14 +384,13 @@ class Patch(artist.Artist):
 
         Parameters
         ----------
-        color : color or None
+        color : :mpltype:`color` or None
         """
         self._original_edgecolor = color
         self._set_edgecolor(color)
 
     def _set_facecolor(self, color):
-        if color is None:
-            color = mpl.rcParams['patch.facecolor']
+        color = mpl._val_or_rc(color, 'patch.facecolor')
         alpha = self._alpha if self._fill else 0
         self._facecolor = colors.to_rgba(color, alpha)
         self.stale = True
@@ -350,7 +401,7 @@ class Patch(artist.Artist):
 
         Parameters
         ----------
-        color : color or None
+        color : :mpltype:`color` or None
         """
         self._original_facecolor = color
         self._set_facecolor(color)
@@ -361,21 +412,42 @@ class Patch(artist.Artist):
 
         Parameters
         ----------
-        c : color
+        c : :mpltype:`color`
 
         See Also
         --------
         Patch.set_facecolor, Patch.set_edgecolor
             For setting the edge or face color individually.
         """
-        self.set_facecolor(c)
         self.set_edgecolor(c)
+        self.set_hatchcolor(c)
+        self.set_facecolor(c)
+
+    def _set_hatchcolor(self, color):
+        color = mpl._val_or_rc(color, 'hatch.color')
+        if cbook._str_equal(color, 'edge'):
+            self._hatch_color = 'edge'
+        else:
+            self._hatch_color = colors.to_rgba(color, self._alpha)
+        self.stale = True
+
+    def set_hatchcolor(self, color):
+        """
+        Set the patch hatch color.
+
+        Parameters
+        ----------
+        color : :mpltype:`color` or 'edge' or None
+        """
+        self._original_hatchcolor = color
+        self._set_hatchcolor(color)
 
     def set_alpha(self, alpha):
         # docstring inherited
         super().set_alpha(alpha)
         self._set_facecolor(self._original_facecolor)
         self._set_edgecolor(self._original_edgecolor)
+        self._set_hatchcolor(self._original_hatchcolor)
         # stale is already True
 
     def set_linewidth(self, w):
@@ -386,26 +458,24 @@ class Patch(artist.Artist):
         ----------
         w : float or None
         """
-        if w is None:
-            w = mpl.rcParams['patch.linewidth']
+        w = mpl._val_or_rc(w, 'patch.linewidth')
         self._linewidth = float(w)
-        self._dash_pattern = mlines._scale_dashes(
-            *self._unscaled_dash_pattern, w)
+        self._dash_pattern = mlines._scale_dashes(*self._unscaled_dash_pattern, w)
         self.stale = True
 
     def set_linestyle(self, ls):
         """
         Set the patch linestyle.
 
-        ==========================================  =================
-        linestyle                                   description
-        ==========================================  =================
-        ``'-'`` or ``'solid'``                      solid line
-        ``'--'`` or  ``'dashed'``                   dashed line
-        ``'-.'`` or  ``'dashdot'``                  dash-dotted line
-        ``':'`` or ``'dotted'``                     dotted line
-        ``'none'``, ``'None'``, ``' '``, or ``''``  draw nothing
-        ==========================================  =================
+        =======================================================  ================
+        linestyle                                                description
+        =======================================================  ================
+        ``'-'`` or ``'solid'``                                   solid line
+        ``'--'`` or ``'dashed'``                                 dashed line
+        ``'-.'`` or ``'dashdot'``                                dash-dotted line
+        ``':'`` or ``'dotted'``                                  dotted line
+        ``''`` or ``'none'`` (discouraged: ``'None'``, ``' '``)  draw nothing
+        =======================================================  ================
 
         Alternatively a dash tuple of the following form can be provided::
 
@@ -439,6 +509,7 @@ class Patch(artist.Artist):
         self._fill = bool(b)
         self._set_facecolor(self._original_facecolor)
         self._set_edgecolor(self._original_edgecolor)
+        self._set_hatchcolor(self._original_hatchcolor)
         self.stale = True
 
     def get_fill(self):
@@ -511,9 +582,6 @@ class Patch(artist.Artist):
         hatchings are done.  If same letter repeats, it increases the
         density of hatching of that pattern.
 
-        Hatching is supported in the PostScript, PDF, SVG and Agg
-        backends only.
-
         Parameters
         ----------
         hatch : {'/', '\\', '|', '-', '+', 'x', 'o', 'O', '.', '*'}
@@ -526,6 +594,14 @@ class Patch(artist.Artist):
     def get_hatch(self):
         """Return the hatching pattern."""
         return self._hatch
+
+    def set_hatch_linewidth(self, lw):
+        """Set the hatch linewidth."""
+        self._hatch_linewidth = lw
+
+    def get_hatch_linewidth(self):
+        """Return the hatch linewidth."""
+        return self._hatch_linewidth
 
     def _draw_paths_with_artist_properties(
             self, renderer, draw_path_args_list):
@@ -560,7 +636,8 @@ class Patch(artist.Artist):
 
         if self._hatch:
             gc.set_hatch(self._hatch)
-            gc.set_hatch_color(self._hatch_color)
+            gc.set_hatch_color(self.get_hatchcolor())
+            gc.set_hatch_linewidth(self._hatch_linewidth)
 
         if self.get_sketch_params() is not None:
             gc.set_sketch_params(*self.get_sketch_params())
@@ -611,7 +688,7 @@ class Shadow(Patch):
     def __str__(self):
         return f"Shadow({self.patch})"
 
-    @_docstring.dedent_interpd
+    @_docstring.interpd
     def __init__(self, patch, ox, oy, *, shade=0.7, **kwargs):
         """
         Create a shadow of the given *patch*.
@@ -691,7 +768,7 @@ class Rectangle(Patch):
         fmt = "Rectangle(xy=(%g, %g), width=%g, height=%g, angle=%g)"
         return fmt % pars
 
-    @_docstring.dedent_interpd
+    @_docstring.interpd
     def __init__(self, xy, width, height, *,
                  angle=0.0, rotation_point='xy', **kwargs):
         """
@@ -892,7 +969,7 @@ class RegularPolygon(Patch):
         return s % (self.xy[0], self.xy[1], self.numvertices, self.radius,
                     self.orientation)
 
-    @_docstring.dedent_interpd
+    @_docstring.interpd
     def __init__(self, xy, numVertices, *,
                  radius=5, orientation=0, **kwargs):
         """
@@ -942,7 +1019,7 @@ class PathPatch(Patch):
         s = "PathPatch%d((%g, %g) ...)"
         return s % (len(self._path.vertices), *tuple(self._path.vertices[0]))
 
-    @_docstring.dedent_interpd
+    @_docstring.interpd
     def __init__(self, path, **kwargs):
         """
         *path* is a `.Path` object.
@@ -971,7 +1048,7 @@ class StepPatch(PathPatch):
 
     _edge_default = False
 
-    @_docstring.dedent_interpd
+    @_docstring.interpd
     def __init__(self, values, edges, *,
                  orientation='vertical', baseline=0, **kwargs):
         """
@@ -1080,7 +1157,7 @@ class Polygon(Patch):
         else:
             return "Polygon0()"
 
-    @_docstring.dedent_interpd
+    @_docstring.interpd
     def __init__(self, xy, *, closed=True, **kwargs):
         """
         Parameters
@@ -1178,7 +1255,7 @@ class Wedge(Patch):
         fmt = "Wedge(center=(%g, %g), r=%g, theta1=%g, theta2=%g, width=%s)"
         return fmt % pars
 
-    @_docstring.dedent_interpd
+    @_docstring.interpd
     def __init__(self, center, r, theta1, theta2, *, width=None, **kwargs):
         """
         A wedge centered at *x*, *y* center with radius *r* that
@@ -1266,7 +1343,7 @@ class Arrow(Patch):
         [0.0, 0.1], [0.0, -0.1], [0.8, -0.1], [0.8, -0.3], [1.0, 0.0],
         [0.8, 0.3], [0.8, 0.1]])
 
-    @_docstring.dedent_interpd
+    @_docstring.interpd
     def __init__(self, x, y, dx, dy, *, width=1.0, **kwargs):
         """
         Draws an arrow from (*x*, *y*) to (*x* + *dx*, *y* + *dy*).
@@ -1297,18 +1374,46 @@ class Arrow(Patch):
             properties.
         """
         super().__init__(**kwargs)
-        self._patch_transform = (
-            transforms.Affine2D()
-            .scale(np.hypot(dx, dy), width)
-            .rotate(np.arctan2(dy, dx))
-            .translate(x, y)
-            .frozen())
+        self.set_data(x, y, dx, dy, width)
 
     def get_path(self):
         return self._path
 
     def get_patch_transform(self):
         return self._patch_transform
+
+    def set_data(self, x=None, y=None, dx=None, dy=None, width=None):
+        """
+        Set `.Arrow` x, y, dx, dy and width.
+        Values left as None will not be updated.
+
+        Parameters
+        ----------
+        x, y : float or None, default: None
+            The x and y coordinates of the arrow base.
+
+        dx, dy : float or None, default: None
+            The length of the arrow along x and y direction.
+
+        width : float or None, default: None
+            Width of full arrow tail.
+        """
+        if x is not None:
+            self._x = x
+        if y is not None:
+            self._y = y
+        if dx is not None:
+            self._dx = dx
+        if dy is not None:
+            self._dy = dy
+        if width is not None:
+            self._width = width
+        self._patch_transform = (
+            transforms.Affine2D()
+            .scale(np.hypot(self._dx, self._dy), self._width)
+            .rotate(np.arctan2(self._dy, self._dx))
+            .translate(self._x, self._y)
+            .frozen())
 
 
 class FancyArrow(Polygon):
@@ -1321,7 +1426,7 @@ class FancyArrow(Polygon):
     def __str__(self):
         return "FancyArrow()"
 
-    @_docstring.dedent_interpd
+    @_docstring.interpd
     def __init__(self, x, y, dx, dy, *,
                  width=0.001, length_includes_head=False, head_width=None,
                  head_length=None, shape='full', overhang=0,
@@ -1480,7 +1585,7 @@ class FancyArrow(Polygon):
             ]
 
 
-_docstring.interpd.update(
+_docstring.interpd.register(
     FancyArrow="\n".join(
         (inspect.getdoc(FancyArrow.__init__) or "").splitlines()[2:]))
 
@@ -1492,7 +1597,7 @@ class CirclePolygon(RegularPolygon):
         s = "CirclePolygon((%g, %g), radius=%g, resolution=%d)"
         return s % (self.xy[0], self.xy[1], self.radius, self.numvertices)
 
-    @_docstring.dedent_interpd
+    @_docstring.interpd
     def __init__(self, xy, radius=5, *,
                  resolution=20,  # the number of vertices
                  ** kwargs):
@@ -1519,7 +1624,7 @@ class Ellipse(Patch):
         fmt = "Ellipse(xy=(%s, %s), width=%s, height=%s, angle=%s)"
         return fmt % pars
 
-    @_docstring.dedent_interpd
+    @_docstring.interpd
     def __init__(self, xy, width, height, *, angle=0, **kwargs):
         """
         Parameters
@@ -1695,7 +1800,7 @@ class Annulus(Patch):
     An elliptical annulus.
     """
 
-    @_docstring.dedent_interpd
+    @_docstring.interpd
     def __init__(self, xy, r, width, angle=0.0, **kwargs):
         """
         Parameters
@@ -1765,9 +1870,9 @@ class Annulus(Patch):
         ----------
         width : float
         """
-        if min(self.a, self.b) <= width:
+        if width > min(self.a, self.b):
             raise ValueError(
-                'Width of annulus must be less than or equal semi-minor axis')
+                'Width of annulus must be less than or equal to semi-minor axis')
 
         self._width = width
         self._path = None
@@ -1886,7 +1991,7 @@ class Circle(Ellipse):
         fmt = "Circle(xy=(%g, %g), radius=%g)"
         return fmt % pars
 
-    @_docstring.dedent_interpd
+    @_docstring.interpd
     def __init__(self, xy, radius=5, **kwargs):
         """
         Create a true circle at center *xy* = (*x*, *y*) with given *radius*.
@@ -1933,7 +2038,7 @@ class Arc(Ellipse):
                "height=%g, angle=%g, theta1=%g, theta2=%g)")
         return fmt % pars
 
-    @_docstring.dedent_interpd
+    @_docstring.interpd
     def __init__(self, xy, width, height, *,
                  angle=0.0, theta1=0.0, theta2=360.0, **kwargs):
         """
@@ -2085,11 +2190,11 @@ class Arc(Ellipse):
                 & (y0e - epsilon < ys) & (ys < y1e + epsilon)
             ]
 
-        # Transform the axes (or figure) box_path so that it is relative to
+        # Transform the Axes (or figure) box_path so that it is relative to
         # the unit circle in the same way that it is relative to the desired
         # ellipse.
         box_path_transform = (
-            transforms.BboxTransformTo((self.axes or self.figure).bbox)
+            transforms.BboxTransformTo((self.axes or self.get_figure(root=False)).bbox)
             - self.get_transform())
         box_path = Path.unit_rectangle().transformed(box_path_transform)
 
@@ -2218,7 +2323,7 @@ class _Style:
         # - %(BoxStyle:table_and_accepts)s
         # - %(ConnectionStyle:table_and_accepts)s
         # - %(ArrowStyle:table_and_accepts)s
-        _docstring.interpd.update({
+        _docstring.interpd.register(**{
             f"{cls.__name__}:table": cls.pprint_styles(),
             f"{cls.__name__}:table_and_accepts": (
                 cls.pprint_styles()
@@ -2275,6 +2380,11 @@ class _Style:
         return textwrap.indent(rst_table, prefix=' ' * 4)
 
     @classmethod
+    @_api.deprecated(
+        '3.10.0',
+        message="This method is never used internally.",
+        alternative="No replacement.  Please open an issue if you use this."
+    )
     def register(cls, name, style):
         """Register a new style."""
         if not issubclass(style, cls._Base):
@@ -2290,7 +2400,7 @@ def _register_style(style_list, cls=None, *, name=None):
     return cls
 
 
-@_docstring.dedent_interpd
+@_docstring.interpd
 class BoxStyle(_Style):
     """
     `BoxStyle` is a container class which defines several
@@ -2655,7 +2765,7 @@ class BoxStyle(_Style):
             return Path(saw_vertices, codes)
 
 
-@_docstring.dedent_interpd
+@_docstring.interpd
 class ConnectionStyle(_Style):
     """
     `ConnectionStyle` is a container class which defines
@@ -3077,7 +3187,7 @@ def _point_along_a_line(x0, y0, x1, y1, d):
     return x2, y2
 
 
-@_docstring.dedent_interpd
+@_docstring.interpd
 class ArrowStyle(_Style):
     """
     `ArrowStyle` is a container class which defines several
@@ -3814,7 +3924,7 @@ class FancyBboxPatch(Patch):
         s = self.__class__.__name__ + "((%g, %g), width=%g, height=%g)"
         return s % (self._x, self._y, self._width, self._height)
 
-    @_docstring.dedent_interpd
+    @_docstring.interpd
     def __init__(self, xy, width, height, boxstyle="round", *,
                  mutation_scale=1, mutation_aspect=1, **kwargs):
         """
@@ -3866,7 +3976,7 @@ class FancyBboxPatch(Patch):
         self._mutation_aspect = mutation_aspect
         self.stale = True
 
-    @_docstring.dedent_interpd
+    @_docstring.interpd
     def set_boxstyle(self, boxstyle=None, **kwargs):
         """
         Set the box style, possibly with further attributes.
@@ -4066,7 +4176,7 @@ class FancyArrowPatch(Patch):
         else:
             return f"{type(self).__name__}({self._path_original})"
 
-    @_docstring.dedent_interpd
+    @_docstring.interpd
     def __init__(self, posA=None, posB=None, *,
                  path=None, arrowstyle="simple", connectionstyle="arc3",
                  patchA=None, patchB=None, shrinkA=2, shrinkB=2,
@@ -4114,7 +4224,7 @@ default: 'arc3'
             Head and tail patches, respectively.
 
         shrinkA, shrinkB : float, default: 2
-            Shrinking factor of the tail and head of the arrow respectively.
+            Shrink amount, in points, of the tail and head of the arrow respectively.
 
         mutation_scale : float, default: 1
             Value with which attributes of *arrowstyle* (e.g., *head_length*)
@@ -4205,7 +4315,7 @@ default: 'arc3'
         self.patchB = patchB
         self.stale = True
 
-    @_docstring.dedent_interpd
+    @_docstring.interpd
     def set_connectionstyle(self, connectionstyle=None, **kwargs):
         """
         Set the connection style, possibly with further attributes.
@@ -4249,6 +4359,7 @@ default: 'arc3'
         """Return the `ConnectionStyle` used."""
         return self._connector
 
+    @_docstring.interpd
     def set_arrowstyle(self, arrowstyle=None, **kwargs):
         """
         Set the arrow style, possibly with further attributes.
@@ -4386,13 +4497,13 @@ default: 'arc3'
 
 
 class ConnectionPatch(FancyArrowPatch):
-    """A patch that connects two points (possibly in different axes)."""
+    """A patch that connects two points (possibly in different Axes)."""
 
     def __str__(self):
         return "ConnectionPatch((%g, %g), (%g, %g))" % \
                (self.xy1[0], self.xy1[1], self.xy2[0], self.xy2[1])
 
-    @_docstring.dedent_interpd
+    @_docstring.interpd
     def __init__(self, xyA, xyB, coordsA, coordsB=None, *,
                  axesA=None, axesB=None,
                  arrowstyle="-",
@@ -4438,15 +4549,15 @@ class ConnectionPatch(FancyArrowPatch):
         'subfigure points'   points from the lower left corner of the subfigure
         'subfigure pixels'   pixels from the lower left corner of the subfigure
         'subfigure fraction' fraction of the subfigure, 0, 0 is lower left.
-        'axes points'        points from lower left corner of axes
-        'axes pixels'        pixels from lower left corner of axes
-        'axes fraction'      0, 0 is lower left of axes and 1, 1 is upper right
+        'axes points'        points from lower left corner of the Axes
+        'axes pixels'        pixels from lower left corner of the Axes
+        'axes fraction'      0, 0 is lower left of Axes and 1, 1 is upper right
         'data'               use the coordinate system of the object being
                              annotated (default)
         'offset points'      offset (in points) from the *xy* value
         'polar'              you can specify *theta*, *r* for the annotation,
                              even in cartesian plots.  Note that if you are
-                             using a polar axes, you do not need to specify
+                             using a polar Axes, you do not need to specify
                              polar for the coordinate system since that is the
                              native "data" coordinate system.
         ==================== ==================================================
@@ -4493,7 +4604,7 @@ class ConnectionPatch(FancyArrowPatch):
                          mutation_aspect=mutation_aspect,
                          clip_on=clip_on,
                          **kwargs)
-        # if True, draw annotation only if self.xy is inside the axes
+        # if True, draw annotation only if self.xy is inside the Axes
         self._annotation_clip = None
 
     def _get_xy(self, xy, s, axes=None):
@@ -4501,29 +4612,34 @@ class ConnectionPatch(FancyArrowPatch):
         s0 = s  # For the error message, if needed.
         if axes is None:
             axes = self.axes
-        xy = np.array(xy)
+
+        # preserve mixed type input (such as str, int)
+        x = np.array(xy[0])
+        y = np.array(xy[1])
+
+        fig = self.get_figure(root=False)
         if s in ["figure points", "axes points"]:
-            xy *= self.figure.dpi / 72
+            x = x * fig.dpi / 72
+            y = y * fig.dpi / 72
             s = s.replace("points", "pixels")
         elif s == "figure fraction":
-            s = self.figure.transFigure
+            s = fig.transFigure
         elif s == "subfigure fraction":
-            s = self.figure.transSubfigure
+            s = fig.transSubfigure
         elif s == "axes fraction":
             s = axes.transAxes
-        x, y = xy
 
         if s == 'data':
             trans = axes.transData
-            x = float(self.convert_xunits(x))
-            y = float(self.convert_yunits(y))
+            x = cbook._to_unmasked_float_array(axes.xaxis.convert_units(x))
+            y = cbook._to_unmasked_float_array(axes.yaxis.convert_units(y))
             return trans.transform((x, y))
         elif s == 'offset points':
             if self.xycoords == 'offset points':  # prevent recursion
                 return self._get_xy(self.xy, 'data')
             return (
                 self._get_xy(self.xy, self.xycoords)  # converted data point
-                + xy * self.figure.dpi / 72)  # converted offset
+                + xy * self.get_figure(root=True).dpi / 72)  # converted offset
         elif s == 'polar':
             theta, r = x, y
             x = r * np.cos(theta)
@@ -4532,18 +4648,18 @@ class ConnectionPatch(FancyArrowPatch):
             return trans.transform((x, y))
         elif s == 'figure pixels':
             # pixels from the lower left corner of the figure
-            bb = self.figure.figbbox
+            bb = self.get_figure(root=False).figbbox
             x = bb.x0 + x if x >= 0 else bb.x1 + x
             y = bb.y0 + y if y >= 0 else bb.y1 + y
             return x, y
         elif s == 'subfigure pixels':
             # pixels from the lower left corner of the figure
-            bb = self.figure.bbox
+            bb = self.get_figure(root=False).bbox
             x = bb.x0 + x if x >= 0 else bb.x1 + x
             y = bb.y0 + y if y >= 0 else bb.y1 + y
             return x, y
         elif s == 'axes pixels':
-            # pixels from the lower left corner of the axes
+            # pixels from the lower left corner of the Axes
             bb = axes.bbox
             x = bb.x0 + x if x >= 0 else bb.x1 + x
             y = bb.y0 + y if y >= 0 else bb.y1 + y
@@ -4561,10 +4677,10 @@ class ConnectionPatch(FancyArrowPatch):
         ----------
         b : bool or None
             - True: The annotation will be clipped when ``self.xy`` is
-              outside the axes.
+              outside the Axes.
             - False: The annotation will always be drawn.
             - None: The annotation will be clipped when ``self.xy`` is
-              outside the axes and ``self.xycoords == "data"``.
+              outside the Axes and ``self.xycoords == "data"``.
         """
         self._annotation_clip = b
         self.stale = True
@@ -4621,8 +4737,6 @@ class ConnectionPatch(FancyArrowPatch):
         return True
 
     def draw(self, renderer):
-        if renderer is not None:
-            self._renderer = renderer
         if not self.get_visible() or not self._check_xy(renderer):
             return
         super().draw(renderer)

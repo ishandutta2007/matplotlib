@@ -1,4 +1,4 @@
-from collections.abc import Callable, Hashable, Iterable
+from collections.abc import Callable, Hashable, Iterable, Sequence
 import os
 from typing import Any, IO, Literal, TypeVar, overload
 
@@ -6,7 +6,7 @@ import numpy as np
 from numpy.typing import ArrayLike
 
 from matplotlib.artist import Artist
-from matplotlib.axes import Axes, SubplotBase
+from matplotlib.axes import Axes
 from matplotlib.backend_bases import (
     FigureCanvasBase,
     MouseButton,
@@ -15,6 +15,7 @@ from matplotlib.backend_bases import (
 )
 from matplotlib.colors import Colormap, Normalize
 from matplotlib.colorbar import Colorbar
+from matplotlib.colorizer import ColorizingArtist, Colorizer
 from matplotlib.cm import ScalarMappable
 from matplotlib.gridspec import GridSpec, SubplotSpec, SubplotParams as SubplotParams
 from matplotlib.image import _ImageBase, FigureImage
@@ -61,6 +62,12 @@ class FigureBase(Artist):
     def get_linewidth(self) -> float: ...
     def set_edgecolor(self, color: ColorType) -> None: ...
     def set_facecolor(self, color: ColorType) -> None: ...
+    @overload
+    def get_figure(self, root: Literal[True]) -> Figure: ...
+    @overload
+    def get_figure(self, root: Literal[False]) -> Figure | SubFigure: ...
+    @overload
+    def get_figure(self, root: bool = ...) -> Figure | SubFigure: ...
     def set_frameon(self, b: bool) -> None: ...
     @property
     def frameon(self) -> bool: ...
@@ -94,17 +101,31 @@ class FigureBase(Artist):
     @overload
     def subplots(
         self,
+        nrows: Literal[1] = ...,
+        ncols: Literal[1] = ...,
+        *,
+        sharex: bool | Literal["none", "all", "row", "col"] = ...,
+        sharey: bool | Literal["none", "all", "row", "col"] = ...,
+        squeeze: Literal[True] = ...,
+        width_ratios: Sequence[float] | None = ...,
+        height_ratios: Sequence[float] | None = ...,
+        subplot_kw: dict[str, Any] | None = ...,
+        gridspec_kw: dict[str, Any] | None = ...,
+    ) -> Axes: ...
+    @overload
+    def subplots(
+        self,
         nrows: int = ...,
         ncols: int = ...,
         *,
         sharex: bool | Literal["none", "all", "row", "col"] = ...,
         sharey: bool | Literal["none", "all", "row", "col"] = ...,
         squeeze: Literal[False],
-        width_ratios: ArrayLike | None = ...,
-        height_ratios: ArrayLike | None = ...,
+        width_ratios: Sequence[float] | None = ...,
+        height_ratios: Sequence[float] | None = ...,
         subplot_kw: dict[str, Any] | None = ...,
-        gridspec_kw: dict[str, Any] | None = ...
-    ) -> np.ndarray: ...
+        gridspec_kw: dict[str, Any] | None = ...,
+    ) -> np.ndarray: ...  # TODO numpy/numpy#24738
     @overload
     def subplots(
         self,
@@ -114,11 +135,11 @@ class FigureBase(Artist):
         sharex: bool | Literal["none", "all", "row", "col"] = ...,
         sharey: bool | Literal["none", "all", "row", "col"] = ...,
         squeeze: bool = ...,
-        width_ratios: ArrayLike | None = ...,
-        height_ratios: ArrayLike | None = ...,
+        width_ratios: Sequence[float] | None = ...,
+        height_ratios: Sequence[float] | None = ...,
         subplot_kw: dict[str, Any] | None = ...,
-        gridspec_kw: dict[str, Any] | None = ...
-    ) -> np.ndarray | SubplotBase | Axes: ...
+        gridspec_kw: dict[str, Any] | None = ...,
+    ) -> Any: ...
     def delaxes(self, ax: Axes) -> None: ...
     def clear(self, keep_observers: bool = ...) -> None: ...
     def clf(self, keep_observers: bool = ...) -> None: ...
@@ -144,7 +165,7 @@ class FigureBase(Artist):
     ) -> Text: ...
     def colorbar(
         self,
-        mappable: ScalarMappable,
+        mappable: ScalarMappable | ColorizingArtist,
         cax: Axes | None = ...,
         ax: Axes | Iterable[Axes] | None = ...,
         use_gridspec: bool = ...,
@@ -161,6 +182,7 @@ class FigureBase(Artist):
     ) -> None: ...
     def align_xlabels(self, axs: Iterable[Axes] | None = ...) -> None: ...
     def align_ylabels(self, axs: Iterable[Axes] | None = ...) -> None: ...
+    def align_titles(self, axs: Iterable[Axes] | None = ...) -> None: ...
     def align_labels(self, axs: Iterable[Axes] | None = ...) -> None: ...
     def add_gridspec(self, nrows: int = ..., ncols: int = ..., **kwargs) -> GridSpec: ...
     @overload
@@ -190,7 +212,7 @@ class FigureBase(Artist):
     def add_subfigure(self, subplotspec: SubplotSpec, **kwargs) -> SubFigure: ...
     def sca(self, a: Axes) -> Axes: ...
     def gca(self) -> Axes: ...
-    def _gci(self) -> ScalarMappable | None: ...
+    def _gci(self) -> ColorizingArtist | None: ...
     def _process_projection_requirements(
         self, *, axes_class=None, polar=False, projection=None, **kwargs
     ) -> tuple[type[Axes], dict[str, Any]]: ...
@@ -245,10 +267,10 @@ class FigureBase(Artist):
     ) -> dict[Hashable, Axes]: ...
 
 class SubFigure(FigureBase):
-    figure: Figure
+    @property
+    def figure(self) -> Figure: ...
     subplotpars: SubplotParams
     dpi_scale_trans: Affine2D
-    canvas: FigureCanvasBase
     transFigure: Transform
     bbox_relative: Bbox
     figbbox: BboxBase
@@ -267,6 +289,8 @@ class SubFigure(FigureBase):
         **kwargs
     ) -> None: ...
     @property
+    def canvas(self) -> FigureCanvasBase: ...
+    @property
     def dpi(self) -> float: ...
     @dpi.setter
     def dpi(self, value: float) -> None: ...
@@ -282,7 +306,8 @@ class SubFigure(FigureBase):
     def get_axes(self) -> list[Axes]: ...
 
 class Figure(FigureBase):
-    figure: Figure
+    @property
+    def figure(self) -> Figure: ...
     bbox_inches: Bbox
     dpi_scale_trans: Affine2D
     bbox: BboxBase
@@ -319,6 +344,10 @@ class Figure(FigureBase):
     def get_layout_engine(self) -> LayoutEngine | None: ...
     def _repr_html_(self) -> str | None: ...
     def show(self, warn: bool = ...) -> None: ...
+    @property
+    def number(self) -> int | str: ...
+    @number.setter
+    def number(self, num: int | str) -> None: ...
     @property  # type: ignore[misc]
     def axes(self) -> list[Axes]: ...  # type: ignore[override]
     def get_axes(self) -> list[Axes]: ...
@@ -345,6 +374,8 @@ class Figure(FigureBase):
         vmax: float | None = ...,
         origin: Literal["upper", "lower"] | None = ...,
         resize: bool = ...,
+        *,
+        colorizer: Colorizer | None = ...,
         **kwargs
     ) -> FigureImage: ...
     def set_size_inches(

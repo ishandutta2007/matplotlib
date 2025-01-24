@@ -6,6 +6,9 @@
 #ifndef MPL_SCALAR_H
 #define MPL_SCALAR_H
 
+#include <cstddef>
+#include <stdexcept>
+
 namespace array
 {
 
@@ -53,9 +56,7 @@ class empty
   public:
     typedef empty<T> sub_t;
 
-    empty()
-    {
-    }
+    empty() = default;
 
     T &operator()(int i, int j = 0, int k = 0)
     {

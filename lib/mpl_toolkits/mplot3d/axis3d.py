@@ -195,11 +195,6 @@ class Axis(maxis.XAxis):
         position : {'lower', 'upper', 'both', 'default', 'none'}
             The position of the bolded axis lines, ticks, and tick labels.
         """
-        if position in ['top', 'bottom']:
-            _api.warn_deprecated('3.8', name=f'{position=}',
-                                 obj_type='argument value',
-                                 alternative="'upper' or 'lower'")
-            return
         _api.check_in_list(['lower', 'upper', 'both', 'default', 'none'],
                            position=position)
         self._tick_position = position
@@ -224,11 +219,6 @@ class Axis(maxis.XAxis):
         position : {'lower', 'upper', 'both', 'default', 'none'}
             The position of the axis label.
         """
-        if position in ['top', 'bottom']:
-            _api.warn_deprecated('3.8', name=f'{position=}',
-                                 obj_type='argument value',
-                                 alternative="'upper' or 'lower'")
-            return
         _api.check_in_list(['lower', 'upper', 'both', 'default', 'none'],
                            position=position)
         self._label_position = position
@@ -250,7 +240,7 @@ class Axis(maxis.XAxis):
 
         Parameters
         ----------
-        color : color
+        color : :mpltype:`color`
             Color for axis pane.
         alpha : float, optional
             Alpha value for axis pane. If None, base it on *color*.
@@ -285,7 +275,7 @@ class Axis(maxis.XAxis):
 
         # Project the bounds along the current position of the cube:
         bounds = mins[0], maxs[0], mins[1], maxs[1], mins[2], maxs[2]
-        bounds_proj = self.axes._tunit_cube(bounds, self.axes.M)
+        bounds_proj = self.axes._transformed_cube(bounds)
 
         # Determine which one of the parallel planes are higher up:
         means_z0 = np.zeros(3)
@@ -586,7 +576,7 @@ class Axis(maxis.XAxis):
 
         # Calculate offset distances
         # A rough estimate; points are ambiguous since 3D plots rotate
-        reltoinches = self.figure.dpi_scale_trans.inverted()
+        reltoinches = self.get_figure(root=False).dpi_scale_trans.inverted()
         ax_inches = reltoinches.transform(self.axes.bbox.size)
         ax_points_estimate = sum(72. * ax_inches)
         deltas_per_point = 48 / ax_points_estimate
