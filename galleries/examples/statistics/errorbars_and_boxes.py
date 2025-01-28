@@ -1,7 +1,7 @@
 """
-====================================================
-Creating boxes from error bars using PatchCollection
-====================================================
+==================================================
+Create boxes from error bars using PatchCollection
+==================================================
 
 In this example, we snazz up a pretty standard error bar plot by adding
 a rectangle patch defined by the limits of the bars in both the x- and
@@ -51,7 +51,7 @@ def make_error_boxes(ax, xdata, ydata, xerror, yerror, facecolor='r',
     pc = PatchCollection(errorboxes, facecolor=facecolor, alpha=alpha,
                          edgecolor=edgecolor)
 
-    # Add collection to axes
+    # Add collection to Axes
     ax.add_collection(pc)
 
     # Plot errorbars
@@ -61,7 +61,7 @@ def make_error_boxes(ax, xdata, ydata, xerror, yerror, facecolor='r',
     return artists
 
 
-# Create figure and axes
+# Create figure and Axes
 fig, ax = plt.subplots(1)
 
 # Call function to create error boxes
@@ -70,6 +70,14 @@ _ = make_error_boxes(ax, x, y, xerr, yerr)
 plt.show()
 
 # %%
+#
+#
+# .. tags::
+#
+#    plot-type: errorbar
+#    component: rectangle
+#    component: patchcollection
+#    domain: statistics
 #
 # .. admonition:: References
 #

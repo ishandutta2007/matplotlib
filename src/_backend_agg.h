@@ -6,15 +6,19 @@
 #ifndef MPL_BACKEND_AGG_H
 #define MPL_BACKEND_AGG_H
 
+#include <pybind11/pybind11.h>
+
 #include <cmath>
-#include <vector>
 #include <algorithm>
+#include <functional>
 
 #include "agg_alpha_mask_u8.h"
 #include "agg_conv_curve.h"
 #include "agg_conv_dash.h"
 #include "agg_conv_stroke.h"
+#include "agg_conv_transform.h"
 #include "agg_image_accessors.h"
+#include "agg_path_storage.h"
 #include "agg_pixfmt_amask_adaptor.h"
 #include "agg_pixfmt_gray.h"
 #include "agg_pixfmt_rgba.h"
@@ -25,7 +29,6 @@
 #include "agg_scanline_bin.h"
 #include "agg_scanline_p.h"
 #include "agg_scanline_storage_aa.h"
-#include "agg_scanline_storage_bin.h"
 #include "agg_scanline_u.h"
 #include "agg_span_allocator.h"
 #include "agg_span_converter.h"
@@ -34,12 +37,13 @@
 #include "agg_span_image_filter_rgba.h"
 #include "agg_span_interpolator_linear.h"
 #include "agg_span_pattern_rgba.h"
-#include "util/agg_color_conv_rgb8.h"
 
 #include "_backend_agg_basic_types.h"
 #include "path_converters.h"
 #include "array.h"
 #include "agg_workaround.h"
+
+namespace py = pybind11;
 
 /**********************************************************************/
 
@@ -60,6 +64,10 @@ class BufferRegion
     {
         delete[] data;
     };
+
+    // prevent copying
+    BufferRegion(const BufferRegion &) = delete;
+    BufferRegion &operator=(const BufferRegion &) = delete;
 
     agg::int8u *get_data()
     {
@@ -86,19 +94,12 @@ class BufferRegion
         return stride;
     }
 
-    void to_string_argb(uint8_t *buf);
-
   private:
     agg::int8u *data;
     agg::rect_i rect;
     int width;
     int height;
     int stride;
-
-  private:
-    // prevent copying
-    BufferRegion(const BufferRegion &);
-    BufferRegion &operator=(const BufferRegion &);
 };
 
 #define MARKER_CACHE_SIZE 512
@@ -115,10 +116,10 @@ class RendererAgg
     typedef agg::renderer_scanline_bin_solid<renderer_base> renderer_bin;
     typedef agg::rasterizer_scanline_aa<agg::rasterizer_sl_clip_dbl> rasterizer;
 
-    typedef agg::scanline_p8 scanline_p8;
-    typedef agg::scanline_bin scanline_bin;
+    typedef agg::scanline32_p8 scanline_p8;
+    typedef agg::scanline32_bin scanline_bin;
     typedef agg::amask_no_clip_gray8 alpha_mask_type;
-    typedef agg::scanline_u8_am<alpha_mask_type> scanline_am;
+    typedef agg::scanline32_u8_am<alpha_mask_type> scanline_am;
 
     typedef agg::renderer_base<agg::pixfmt_gray8> renderer_base_alpha_mask_type;
     typedef agg::renderer_scanline_aa_solid<renderer_base_alpha_mask_type> renderer_alpha_mask_type;
@@ -348,7 +349,8 @@ RendererAgg::_draw_path(path_t &path, bool has_clippath, const facepair_t &face,
         agg::trans_affine hatch_trans;
         hatch_trans *= agg::trans_affine_scaling(1.0, -1.0);
         hatch_trans *= agg::trans_affine_translation(0.0, 1.0);
-        hatch_trans *= agg::trans_affine_scaling(hatch_size, hatch_size);
+        hatch_trans *= agg::trans_affine_scaling(static_cast<double>(hatch_size),
+                                                 static_cast<double>(hatch_size));
         hatch_path_trans_t hatch_path_trans(hatch_path, hatch_trans);
         hatch_path_curve_t hatch_path_curve(hatch_path_trans);
         hatch_path_stroke_t hatch_path_stroke(hatch_path_curve);
@@ -731,22 +733,25 @@ inline void RendererAgg::draw_text_image(GCAgg &gc, ImageArray &image, int x, in
     rendererBase.reset_clipping(true);
     if (angle != 0.0) {
         agg::rendering_buffer srcbuf(
-                image.data(), (unsigned)image.shape(1),
+                image.mutable_data(0, 0), (unsigned)image.shape(1),
                 (unsigned)image.shape(0), (unsigned)image.shape(1));
         agg::pixfmt_gray8 pixf_img(srcbuf);
 
         set_clipbox(gc.cliprect, theRasterizer);
 
+        auto image_height = static_cast<double>(image.shape(0)),
+             image_width = static_cast<double>(image.shape(1));
+
         agg::trans_affine mtx;
-        mtx *= agg::trans_affine_translation(0, -image.shape(0));
+        mtx *= agg::trans_affine_translation(0, -image_height);
         mtx *= agg::trans_affine_rotation(-angle * (agg::pi / 180.0));
         mtx *= agg::trans_affine_translation(x, y);
 
         agg::path_storage rect;
         rect.move_to(0, 0);
-        rect.line_to(image.shape(1), 0);
-        rect.line_to(image.shape(1), image.shape(0));
-        rect.line_to(0, image.shape(0));
+        rect.line_to(image_width, 0);
+        rect.line_to(image_width, image_height);
+        rect.line_to(0, image_height);
         rect.line_to(0, 0);
         agg::conv_transform<agg::path_storage> rect2(rect, mtx);
 
@@ -831,20 +836,24 @@ inline void RendererAgg::draw_image(GCAgg &gc,
     bool has_clippath = render_clippath(gc.clippath.path, gc.clippath.trans, gc.snap_mode);
 
     agg::rendering_buffer buffer;
-    buffer.attach(
-        image.data(), (unsigned)image.shape(1), (unsigned)image.shape(0), -(int)image.shape(1) * 4);
+    buffer.attach(image.mutable_data(0, 0, 0),
+                  (unsigned)image.shape(1), (unsigned)image.shape(0),
+                  -(int)image.shape(1) * 4);
     pixfmt pixf(buffer);
 
     if (has_clippath) {
         agg::trans_affine mtx;
         agg::path_storage rect;
 
-        mtx *= agg::trans_affine_translation((int)x, (int)(height - (y + image.shape(0))));
+        auto image_height = static_cast<double>(image.shape(0)),
+             image_width = static_cast<double>(image.shape(1));
+
+        mtx *= agg::trans_affine_translation((int)x, (int)(height - (y + image_height)));
 
         rect.move_to(0, 0);
-        rect.line_to(image.shape(1), 0);
-        rect.line_to(image.shape(1), image.shape(0));
-        rect.line_to(0, image.shape(0));
+        rect.line_to(image_width, 0);
+        rect.line_to(image_width, image_height);
+        rect.line_to(0, image_height);
         rect.line_to(0, 0);
 
         agg::conv_transform<agg::path_storage> rect2(rect, mtx);
@@ -880,7 +889,7 @@ inline void RendererAgg::draw_image(GCAgg &gc,
     } else {
         set_clipbox(gc.cliprect, rendererBase);
         rendererBase.blend_from(
-            pixf, 0, (int)x, (int)(height - (y + image.shape(0))), (agg::int8u)(alpha * 255));
+            pixf, nullptr, (int)x, (int)(height - (y + image.shape(0))), (agg::int8u)(alpha * 255));
     }
 
     rendererBase.reset_clipping(true);
@@ -916,6 +925,10 @@ inline void RendererAgg::_draw_path_collection_generic(GCAgg &gc,
     typedef PathSnapper<clipped_t> snapped_t;
     typedef agg::conv_curve<snapped_t> snapped_curve_t;
     typedef agg::conv_curve<clipped_t> curve_t;
+    typedef Sketch<clipped_t> sketch_clipped_t;
+    typedef Sketch<curve_t> sketch_curve_t;
+    typedef Sketch<snapped_t> sketch_snapped_t;
+    typedef Sketch<snapped_curve_t> sketch_snapped_curve_t;
 
     size_t Npaths = path_generator.num_paths();
     size_t Noffsets = safe_first_shape(offsets);
@@ -991,31 +1004,29 @@ inline void RendererAgg::_draw_path_collection_generic(GCAgg &gc,
             }
         }
 
+        gc.isaa = antialiaseds(i % Naa);
+        transformed_path_t tpath(path, trans);
+        nan_removed_t nan_removed(tpath, true, has_codes);
+        clipped_t clipped(nan_removed, do_clip, width, height);
         if (check_snap) {
-            gc.isaa = antialiaseds(i % Naa);
-
-            transformed_path_t tpath(path, trans);
-            nan_removed_t nan_removed(tpath, true, has_codes);
-            clipped_t clipped(nan_removed, do_clip, width, height);
             snapped_t snapped(
                 clipped, gc.snap_mode, path.total_vertices(), points_to_pixels(gc.linewidth));
             if (has_codes) {
                 snapped_curve_t curve(snapped);
-                _draw_path(curve, has_clippath, face, gc);
+                sketch_snapped_curve_t sketch(curve, gc.sketch.scale, gc.sketch.length, gc.sketch.randomness);
+                _draw_path(sketch, has_clippath, face, gc);
             } else {
-                _draw_path(snapped, has_clippath, face, gc);
+                sketch_snapped_t sketch(snapped, gc.sketch.scale, gc.sketch.length, gc.sketch.randomness);
+                _draw_path(sketch, has_clippath, face, gc);
             }
         } else {
-            gc.isaa = antialiaseds(i % Naa);
-
-            transformed_path_t tpath(path, trans);
-            nan_removed_t nan_removed(tpath, true, has_codes);
-            clipped_t clipped(nan_removed, do_clip, width, height);
             if (has_codes) {
                 curve_t curve(clipped);
-                _draw_path(curve, has_clippath, face, gc);
+                sketch_curve_t sketch(curve, gc.sketch.scale, gc.sketch.length, gc.sketch.randomness);
+                _draw_path(sketch, has_clippath, face, gc);
             } else {
-                _draw_path(clipped, has_clippath, face, gc);
+                sketch_clipped_t sketch(clipped, gc.sketch.scale, gc.sketch.length, gc.sketch.randomness);
+                _draw_path(sketch, has_clippath, face, gc);
             }
         }
     }
@@ -1229,14 +1240,27 @@ inline void RendererAgg::draw_gouraud_triangles(GCAgg &gc,
                                                 ColorArray &colors,
                                                 agg::trans_affine &trans)
 {
+    if (points.shape(0)) {
+        check_trailing_shape(points, "points", 3, 2);
+    }
+    if (colors.shape(0)) {
+        check_trailing_shape(colors, "colors", 3, 4);
+    }
+    if (points.shape(0) != colors.shape(0)) {
+        throw py::value_error(
+            "points and colors arrays must be the same length, got " +
+            std::to_string(points.shape(0)) + " points and " +
+            std::to_string(colors.shape(0)) + "colors");
+    }
+
     theRasterizer.reset_clipping();
     rendererBase.reset_clipping(true);
     set_clipbox(gc.cliprect, theRasterizer);
     bool has_clippath = render_clippath(gc.clippath.path, gc.clippath.trans, gc.snap_mode);
 
     for (int i = 0; i < points.shape(0); ++i) {
-        typename PointArray::sub_t point = points.subarray(i);
-        typename ColorArray::sub_t color = colors.subarray(i);
+        auto point = std::bind(points, i, std::placeholders::_1, std::placeholders::_2);
+        auto color = std::bind(colors, i, std::placeholders::_1, std::placeholders::_2);
 
         _draw_gouraud_triangle(point, color, trans, has_clippath);
     }

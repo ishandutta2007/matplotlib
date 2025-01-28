@@ -1,7 +1,7 @@
 
 .. redirect-from:: /users/explain/figure
 
-.. _figure_explanation:
+.. _figure-intro:
 
 +++++++++++++++++++++++
 Introduction to Figures
@@ -36,6 +36,8 @@ We will discuss how to create Figures in more detail below, but first it is
 helpful to understand how to view a Figure.  This varies based on how you are
 using Matplotlib, and what :ref:`Backend <what-is-a-backend>` you are using.
 
+.. _notebooks-and-ides:
+
 Notebooks and IDEs
 ------------------
 
@@ -50,14 +52,20 @@ Notebooks and IDEs
 
 If you are using a Notebook (e.g. `Jupyter <https://jupyter.org>`_) or an IDE
 that renders Notebooks (PyCharm, VSCode, etc), then they have a backend that
-will render the Matplotlib Figure when a code cell is executed.  One thing to
-be aware of is that the default Jupyter backend (``%matplotlib inline``) will
+will render the Matplotlib Figure when a code cell is executed.  The default
+Jupyter backend (``%matplotlib inline``) creates static plots that
 by default trim or expand the figure size to have a tight box around Artists
-added to the Figure (see :ref:`saving_figures`, below).  If you use a backend
-other than the default "inline" backend, you will likely need to use an ipython
-"magic" like ``%matplotlib notebook`` for the Matplotlib :ref:`notebook
-<jupyter_notebooks_jupyterlab>` or ``%matplotlib widget`` for the  `ipympl
-<https://matplotlib.org/ipympl/>`_ backend.
+added to the Figure (see :ref:`saving_figures`, below).  For interactive plots
+in Jupyter you will need to use an ipython "magic" like ``%matplotlib widget``
+for the  `ipympl <https://matplotlib.org/ipympl/>`_ backend in ``jupyter lab``
+or ``notebook>=7``, or ``%matplotlib notebook`` for the Matplotlib
+:ref:`notebook <jupyter_notebooks_jupyterlab>` in ``notebook<7`` or
+``nbclassic``.
+
+.. note::
+
+    The  `ipympl <https://matplotlib.org/ipympl/>`_ backend is in a separate
+    package, see :ref:`Installing ipympl <ipympl_install>`.
 
 .. figure:: /_static/FigureNotebook.png
     :alt: Image of figure generated in Jupyter Notebook with notebook
@@ -72,6 +80,8 @@ other than the default "inline" backend, you will likely need to use an ipython
 
 .. seealso::
     :ref:`interactive_figures`.
+
+.. _standalone-scripts-and-interactive-use:
 
 Standalone scripts and interactive use
 --------------------------------------
@@ -91,7 +101,7 @@ backend.  These are typically chosen either in the user's :ref:`matplotlibrc
     QtAgg backend.
 
 When run from a script, or interactively (e.g. from an
-`iPython shell <https://ipython.readthedocs.io/en/stable/>`_) the Figure
+`IPython shell <https://ipython.readthedocs.io/en/stable/>`_) the Figure
 will not be shown until we call ``plt.show()``. The Figure will appear in
 a new GUI window, and usually will have a toolbar with Zoom, Pan, and other tools
 for interacting with the Figure.  By default, ``plt.show()`` blocks

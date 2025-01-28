@@ -14,9 +14,9 @@ from matplotlib import pyplot as plt
 from matplotlib._pylab_helpers import Gcf
 from matplotlib import _c_internal_utils
 
-
 try:
-    from matplotlib.backends.qt_compat import QtGui, QtWidgets  # type: ignore # noqa
+    from matplotlib.backends.qt_compat import QtGui  # type: ignore[attr-defined]  # noqa: E501, F401
+    from matplotlib.backends.qt_compat import QtWidgets  # type: ignore[attr-defined]
     from matplotlib.backends.qt_editor import _formlayout
 except ImportError:
     pytestmark = pytest.mark.skip('No usable Qt bindings')
@@ -27,9 +27,7 @@ _test_timeout = 60  # A reasonably safe value for slower architectures.
 
 @pytest.fixture
 def qt_core(request):
-    qt_compat = pytest.importorskip('matplotlib.backends.qt_compat')
-    QtCore = qt_compat.QtCore
-
+    from matplotlib.backends.qt_compat import QtCore
     return QtCore
 
 
@@ -229,6 +227,20 @@ def test_figureoptions():
 
 
 @pytest.mark.backend('QtAgg', skip_on_importerror=True)
+def test_save_figure_return():
+    fig, ax = plt.subplots()
+    ax.imshow([[1]])
+    prop = "matplotlib.backends.qt_compat.QtWidgets.QFileDialog.getSaveFileName"
+    with mock.patch(prop, return_value=("foobar.png", None)):
+        fname = fig.canvas.manager.toolbar.save_figure()
+        os.remove("foobar.png")
+        assert fname == "foobar.png"
+    with mock.patch(prop, return_value=(None, None)):
+        fname = fig.canvas.manager.toolbar.save_figure()
+        assert fname is None
+
+
+@pytest.mark.backend('QtAgg', skip_on_importerror=True)
 def test_figureoptions_with_datetime_axes():
     fig, ax = plt.subplots()
     xydata = [
@@ -375,3 +387,9 @@ def test_fig_sigint_override(qt_core):
     finally:
         # Reset SIGINT handler to what it was before the test
         signal.signal(signal.SIGINT, original_handler)
+
+
+@pytest.mark.backend('QtAgg', skip_on_importerror=True)
+def test_ipython():
+    from matplotlib.testing import ipython_in_subprocess
+    ipython_in_subprocess("qt", {(8, 24): "qtagg", (8, 15): "QtAgg", (7, 0): "Qt5Agg"})

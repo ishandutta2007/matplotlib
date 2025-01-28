@@ -124,11 +124,11 @@ def test_patheffects():
 
 @needs_usetex
 @needs_ghostscript
-def test_tilde_in_tempfilename(tmpdir):
+def test_tilde_in_tempfilename(tmp_path):
     # Tilde ~ in the tempdir path (e.g. TMPDIR, TMP or TEMP on windows
     # when the username is very long and windows uses a short name) breaks
     # latex before https://github.com/matplotlib/matplotlib/pull/5928
-    base_tempdir = Path(tmpdir, "short-1")
+    base_tempdir = tmp_path / "short-1"
     base_tempdir.mkdir()
     # Change the path for new tempdirs, which is used internally by the ps
     # backend to write a file.
@@ -371,10 +371,10 @@ def test_colorbar_shift(tmp_path):
     plt.colorbar()
 
 
-def test_auto_papersize_deprecation():
+def test_auto_papersize_removal():
     fig = plt.figure()
-    with pytest.warns(mpl.MatplotlibDeprecationWarning):
+    with pytest.raises(ValueError, match="'auto' is not a valid value"):
         fig.savefig(io.BytesIO(), format='eps', papertype='auto')
 
-    with pytest.warns(mpl.MatplotlibDeprecationWarning):
+    with pytest.raises(ValueError, match="'auto' is not a valid value"):
         mpl.rcParams['ps.papersize'] = 'auto'

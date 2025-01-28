@@ -1,6 +1,7 @@
 .. redirect-from:: /api/api_changes_old
 .. redirect-from:: /users/whats_new_old
 
+.. _release-notes:
 
 =============
 Release notes
@@ -11,6 +12,29 @@ Release notes
 
    .. include:: release_notes_next.rst
 
+Version 3.10
+^^^^^^^^^^^^
+.. toctree::
+    :maxdepth: 1
+
+    prev_whats_new/whats_new_3.10.0.rst
+    ../api/prev_api_changes/api_changes_3.10.0.rst
+    prev_whats_new/github_stats_3.10.0.rst
+
+Version 3.9
+^^^^^^^^^^^
+.. toctree::
+    :maxdepth: 1
+
+    prev_whats_new/whats_new_3.9.0.rst
+    ../api/prev_api_changes/api_changes_3.9.2.rst
+    ../api/prev_api_changes/api_changes_3.9.1.rst
+    ../api/prev_api_changes/api_changes_3.9.0.rst
+    prev_whats_new/github_stats_3.9.4.rst
+    prev_whats_new/github_stats_3.9.3.rst
+    prev_whats_new/github_stats_3.9.2.rst
+    prev_whats_new/github_stats_3.9.1.rst
+    prev_whats_new/github_stats_3.9.0.rst
 
 Version 3.8
 ^^^^^^^^^^^
@@ -18,8 +42,12 @@ Version 3.8
     :maxdepth: 1
 
     prev_whats_new/whats_new_3.8.0.rst
+    ../api/prev_api_changes/api_changes_3.8.1.rst
     ../api/prev_api_changes/api_changes_3.8.0.rst
-    github_stats.rst
+    prev_whats_new/github_stats_3.8.3.rst
+    prev_whats_new/github_stats_3.8.2.rst
+    prev_whats_new/github_stats_3.8.1.rst
+    prev_whats_new/github_stats_3.8.0.rst
 
 Version 3.7
 ^^^^^^^^^^^
@@ -71,10 +99,6 @@ Version 3.4
     ../api/prev_api_changes/api_changes_3.4.0.rst
     prev_whats_new/github_stats_3.4.1.rst
     prev_whats_new/github_stats_3.4.0.rst
-
-=============
-Past versions
-=============
 
 Version 3.3
 ^^^^^^^^^^^

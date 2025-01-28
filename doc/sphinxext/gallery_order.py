@@ -86,6 +86,8 @@ list_all = [
     "color_demo",
     #  pies
     "pie_features", "pie_demo2",
+    # scales
+    "scales",  # Scales overview
 
     # **Plot Types
     # Basic
@@ -105,7 +107,7 @@ list_all = [
 explicit_subsection_order = [item + ".py" for item in list_all]
 
 
-class MplExplicitSubOrder:
+class MplExplicitSubOrder(ExplicitOrder):
     """For use within the 'within_subsection_order' key."""
     def __init__(self, src_dir):
         self.src_dir = src_dir  # src_dir is unused here
