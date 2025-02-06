@@ -1,5 +1,4 @@
 from collections import Counter
-from pathlib import Path
 import io
 import re
 import tempfile
@@ -7,9 +6,10 @@ import tempfile
 import numpy as np
 import pytest
 
-from matplotlib import cbook, path, patheffects, font_manager as fm
+from matplotlib import cbook, path, patheffects
 from matplotlib.figure import Figure
 from matplotlib.patches import Ellipse
+from matplotlib.testing import _gen_multi_font_text
 from matplotlib.testing._markers import needs_ghostscript, needs_usetex
 from matplotlib.testing.decorators import check_figures_equal, image_comparison
 import matplotlib as mpl
@@ -124,11 +124,11 @@ def test_patheffects():
 
 @needs_usetex
 @needs_ghostscript
-def test_tilde_in_tempfilename(tmpdir):
+def test_tilde_in_tempfilename(tmp_path):
     # Tilde ~ in the tempdir path (e.g. TMPDIR, TMP or TEMP on windows
     # when the username is very long and windows uses a short name) breaks
     # latex before https://github.com/matplotlib/matplotlib/pull/5928
-    base_tempdir = Path(tmpdir, "short-1")
+    base_tempdir = tmp_path / "short-1"
     base_tempdir.mkdir()
     # Change the path for new tempdirs, which is used internally by the ps
     # backend to write a file.
@@ -318,30 +318,26 @@ def test_no_duplicate_definition():
     assert max(Counter(wds).values()) == 1
 
 
-@image_comparison(["multi_font_type3.eps"], tol=0.51)
+@image_comparison(["multi_font_type3.eps"])
 def test_multi_font_type3():
-    fp = fm.FontProperties(family=["WenQuanYi Zen Hei"])
-    if Path(fm.findfont(fp)).name != "wqy-zenhei.ttc":
-        pytest.skip("Font may be missing")
-
-    plt.rc('font', family=['DejaVu Sans', 'WenQuanYi Zen Hei'], size=27)
+    fonts, test_str = _gen_multi_font_text()
+    plt.rc('font', family=fonts, size=16)
     plt.rc('ps', fonttype=3)
 
     fig = plt.figure()
-    fig.text(0.15, 0.475, "There are 几个汉字 in between!")
+    fig.text(0.5, 0.5, test_str,
+             horizontalalignment='center', verticalalignment='center')
 
 
-@image_comparison(["multi_font_type42.eps"], tol=1.6)
+@image_comparison(["multi_font_type42.eps"])
 def test_multi_font_type42():
-    fp = fm.FontProperties(family=["WenQuanYi Zen Hei"])
-    if Path(fm.findfont(fp)).name != "wqy-zenhei.ttc":
-        pytest.skip("Font may be missing")
-
-    plt.rc('font', family=['DejaVu Sans', 'WenQuanYi Zen Hei'], size=27)
+    fonts, test_str = _gen_multi_font_text()
+    plt.rc('font', family=fonts, size=16)
     plt.rc('ps', fonttype=42)
 
     fig = plt.figure()
-    fig.text(0.15, 0.475, "There are 几个汉字 in between!")
+    fig.text(0.5, 0.5, test_str,
+             horizontalalignment='center', verticalalignment='center')
 
 
 @image_comparison(["scatter.eps"])
@@ -371,10 +367,10 @@ def test_colorbar_shift(tmp_path):
     plt.colorbar()
 
 
-def test_auto_papersize_deprecation():
+def test_auto_papersize_removal():
     fig = plt.figure()
-    with pytest.warns(mpl.MatplotlibDeprecationWarning):
+    with pytest.raises(ValueError, match="'auto' is not a valid value"):
         fig.savefig(io.BytesIO(), format='eps', papertype='auto')
 
-    with pytest.warns(mpl.MatplotlibDeprecationWarning):
+    with pytest.raises(ValueError, match="'auto' is not a valid value"):
         mpl.rcParams['ps.papersize'] = 'auto'

@@ -7,10 +7,10 @@ import numpy as np
 from numpy.typing import ArrayLike, NDArray
 import PIL.Image
 
-import matplotlib.artist as martist
 from matplotlib.axes import Axes
-from matplotlib import cm
+from matplotlib import colorizer
 from matplotlib.backend_bases import RendererBase, MouseEvent
+from matplotlib.colorizer import Colorizer
 from matplotlib.colors import Colormap, Normalize
 from matplotlib.figure import Figure
 from matplotlib.transforms import Affine2D, BboxBase, Bbox, Transform
@@ -58,7 +58,7 @@ def composite_images(
     images: Sequence[_ImageBase], renderer: RendererBase, magnification: float = ...
 ) -> tuple[np.ndarray, float, float]: ...
 
-class _ImageBase(martist.Artist, cm.ScalarMappable):
+class _ImageBase(colorizer.ColorizingArtist):
     zorder: float
     origin: Literal["upper", "lower"]
     axes: Axes
@@ -67,13 +67,14 @@ class _ImageBase(martist.Artist, cm.ScalarMappable):
         ax: Axes,
         cmap: str | Colormap | None = ...,
         norm: str | Normalize | None = ...,
+        colorizer: Colorizer | None = ...,
         interpolation: str | None = ...,
         origin: Literal["upper", "lower"] | None = ...,
         filternorm: bool = ...,
         filterrad: float = ...,
         resample: bool | None = ...,
         *,
-        interpolation_stage: Literal["data", "rgba"] | None = ...,
+        interpolation_stage: Literal["data", "rgba", "auto"] | None = ...,
         **kwargs
     ) -> None: ...
     def get_size(self) -> tuple[int, int]: ...
@@ -82,14 +83,15 @@ class _ImageBase(martist.Artist, cm.ScalarMappable):
     def make_image(
         self, renderer: RendererBase, magnification: float = ..., unsampled: bool = ...
     ) -> tuple[np.ndarray, float, float, Affine2D]: ...
-    def draw(self, renderer: RendererBase, *args, **kwargs) -> None: ...
+    def draw(self, renderer: RendererBase) -> None: ...
     def write_png(self, fname: str | pathlib.Path | BinaryIO) -> None: ...
     def set_data(self, A: ArrayLike | None) -> None: ...
     def set_array(self, A: ArrayLike | None) -> None: ...
     def get_shape(self) -> tuple[int, int, int]: ...
     def get_interpolation(self) -> str: ...
     def set_interpolation(self, s: str | None) -> None: ...
-    def set_interpolation_stage(self, s: Literal["data", "rgba"]) -> None: ...
+    def get_interpolation_stage(self) -> Literal["data", "rgba", "auto"]: ...
+    def set_interpolation_stage(self, s: Literal["data", "rgba", "auto"]) -> None: ...
     def can_composite(self) -> bool: ...
     def set_resample(self, v: bool | None) -> None: ...
     def get_resample(self) -> bool: ...
@@ -105,13 +107,14 @@ class AxesImage(_ImageBase):
         *,
         cmap: str | Colormap | None = ...,
         norm: str | Normalize | None = ...,
+        colorizer: Colorizer | None = ...,
         interpolation: str | None = ...,
         origin: Literal["upper", "lower"] | None = ...,
         extent: tuple[float, float, float, float] | None = ...,
         filternorm: bool = ...,
         filterrad: float = ...,
         resample: bool = ...,
-        interpolation_stage: Literal["data", "rgba"] | None = ...,
+        interpolation_stage: Literal["data", "rgba", "auto"] | None = ...,
         **kwargs
     ) -> None: ...
     def get_window_extent(self, renderer: RendererBase | None = ...) -> Bbox: ...
@@ -143,6 +146,7 @@ class PcolorImage(AxesImage):
         *,
         cmap: str | Colormap | None = ...,
         norm: str | Normalize | None = ...,
+        colorizer: Colorizer | None = ...,
         **kwargs
     ) -> None: ...
     def set_data(self, x: ArrayLike, y: ArrayLike, A: ArrayLike) -> None: ...  # type: ignore[override]
@@ -159,6 +163,7 @@ class FigureImage(_ImageBase):
         *,
         cmap: str | Colormap | None = ...,
         norm: str | Normalize | None = ...,
+        colorizer: Colorizer | None = ...,
         offsetx: int = ...,
         offsety: int = ...,
         origin: Literal["upper", "lower"] | None = ...,
@@ -174,6 +179,7 @@ class BboxImage(_ImageBase):
         *,
         cmap: str | Colormap | None = ...,
         norm: str | Normalize | None = ...,
+        colorizer: Colorizer | None = ...,
         interpolation: str | None = ...,
         origin: Literal["upper", "lower"] | None = ...,
         filternorm: bool = ...,
