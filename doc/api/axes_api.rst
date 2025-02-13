@@ -28,6 +28,17 @@ The Axes class
 
    Axes
 
+Attributes
+----------
+
+.. autosummary::
+   :toctree: _as_gen
+   :template: autosummary.rst
+   :nosignatures:
+
+   Axes.viewLim
+   Axes.dataLim
+
 Plotting
 ========
 
@@ -274,8 +285,12 @@ Axis limits and direction
    :template: autosummary.rst
    :nosignatures:
 
+   Axes.set_xinverted
+   Axes.get_xinverted
    Axes.invert_xaxis
    Axes.xaxis_inverted
+   Axes.set_yinverted
+   Axes.get_yinverted
    Axes.invert_yaxis
    Axes.yaxis_inverted
 
@@ -517,6 +532,9 @@ Interactive
    Axes.get_navigate_mode
    Axes.set_navigate_mode
 
+   Axes.get_forward_navigation_events
+   Axes.set_forward_navigation_events
+
    Axes.start_pan
    Axes.drag_pan
    Axes.end_pan
@@ -602,5 +620,6 @@ Other
    Axes.get_transformed_clip_path_and_affine
    Axes.has_data
    Axes.set
+   Axes.remove
 
 .. autoclass:: matplotlib.axes.Axes.ArtistList

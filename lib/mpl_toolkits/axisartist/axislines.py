@@ -45,6 +45,8 @@ import matplotlib as mpl
 from matplotlib import _api
 import matplotlib.axes as maxes
 from matplotlib.path import Path
+from matplotlib.transforms import Bbox
+
 from mpl_toolkits.axes_grid1 import mpl_axes
 from .axisline_style import AxislineStyle  # noqa
 from .axis_artist import AxisArtist, GridlinesCollection
@@ -84,8 +86,14 @@ class _AxisArtistHelperBase:
             return iter_major, iter_minor
     """
 
+    def __init__(self, nth_coord):
+        self.nth_coord = nth_coord
+
     def update_lim(self, axes):
         pass
+
+    def get_nth_coord(self):
+        return self.nth_coord
 
     def _to_xy(self, values, const):
         """
@@ -115,16 +123,12 @@ class _FixedAxisArtistHelperBase(_AxisArtistHelperBase):
     @_api.delete_parameter("3.9", "nth_coord")
     def __init__(self, loc, nth_coord=None):
         """``nth_coord = 0``: x-axis; ``nth_coord = 1``: y-axis."""
-        self.nth_coord = _api.check_getitem(
-            {"bottom": 0, "top": 0, "left": 1, "right": 1}, loc=loc)
+        super().__init__(_api.check_getitem(
+            {"bottom": 0, "top": 0, "left": 1, "right": 1}, loc=loc))
         self._loc = loc
         self._pos = {"bottom": 0, "top": 1, "left": 0, "right": 1}[loc]
-        super().__init__()
         # axis line in transAxes
         self._path = Path(self._to_xy((0, 1), const=self._pos))
-
-    def get_nth_coord(self):
-        return self.nth_coord
 
     # LINE
 
@@ -153,23 +157,16 @@ class _FixedAxisArtistHelperBase(_AxisArtistHelperBase):
     # TICK
 
     def get_tick_transform(self, axes):
-        return [axes.get_xaxis_transform(),
-                axes.get_yaxis_transform()][self.nth_coord]
+        return [axes.get_xaxis_transform(), axes.get_yaxis_transform()][self.nth_coord]
 
 
 class _FloatingAxisArtistHelperBase(_AxisArtistHelperBase):
-
     def __init__(self, nth_coord, value):
-        self.nth_coord = nth_coord
         self._value = value
-        super().__init__()
-
-    def get_nth_coord(self):
-        return self.nth_coord
+        super().__init__(nth_coord)
 
     def get_line(self, axes):
-        raise RuntimeError(
-            "get_line method should be defined by the derived class")
+        raise RuntimeError("get_line method should be defined by the derived class")
 
 
 class FixedAxisArtistHelperRectilinear(_FixedAxisArtistHelperBase):
@@ -187,10 +184,7 @@ class FixedAxisArtistHelperRectilinear(_FixedAxisArtistHelperBase):
 
     def get_tick_iterators(self, axes):
         """tick_loc, tick_angle, tick_label"""
-        if self._loc in ["bottom", "top"]:
-            angle_normal, angle_tangent = 90, 0
-        else:  # "left", "right"
-            angle_normal, angle_tangent = 0, 90
+        angle_normal, angle_tangent = {0: (90, 0), 1: (0, 90)}[self.nth_coord]
 
         major = self.axis.major
         major_locs = major.locator()
@@ -207,8 +201,7 @@ class FixedAxisArtistHelperRectilinear(_FixedAxisArtistHelperBase):
                 c = self._to_xy(loc, const=self._pos)
                 # check if the tick point is inside axes
                 c2 = tick_to_axes.transform(c)
-                if mpl.transforms._interval_contains_close(
-                        (0, 1), c2[self.nth_coord]):
+                if mpl.transforms._interval_contains_close((0, 1), c2[self.nth_coord]):
                     yield c, angle_normal, angle_tangent, label
 
         return _f(major_locs, major_labels), _f(minor_locs, minor_labels)
@@ -245,20 +238,14 @@ class FloatingAxisArtistHelperRectilinear(_FloatingAxisArtistHelperBase):
         data_to_axes = axes.transData - axes.transAxes
         p = data_to_axes.transform([self._value, self._value])
         verts = self._to_xy(0.5, const=p[fixed_coord])
-        if 0 <= verts[fixed_coord] <= 1:
-            return verts, angle
-        else:
-            return None, None
+        return (verts, angle) if 0 <= verts[fixed_coord] <= 1 else (None, None)
 
     def get_tick_transform(self, axes):
         return axes.transData
 
     def get_tick_iterators(self, axes):
         """tick_loc, tick_angle, tick_label"""
-        if self.nth_coord == 0:
-            angle_normal, angle_tangent = 90, 0
-        else:
-            angle_normal, angle_tangent = 0, 90
+        angle_normal, angle_tangent = {0: (90, 0), 1: (0, 90)}[self.nth_coord]
 
         major = self.axis.major
         major_locs = major.locator()
@@ -300,10 +287,10 @@ class GridHelperBase:
         x1, x2 = axes.get_xlim()
         y1, y2 = axes.get_ylim()
         if self._old_limits != (x1, x2, y1, y2):
-            self._update_grid(x1, y1, x2, y2)
+            self._update_grid(Bbox.from_extents(x1, y1, x2, y2))
             self._old_limits = (x1, x2, y1, y2)
 
-    def _update_grid(self, x1, y1, x2, y2):
+    def _update_grid(self, bbox):
         """Cache relevant computations when the axes limits have changed."""
 
     def get_gridlines(self, which, axis):
@@ -326,27 +313,18 @@ class GridHelperRectlinear(GridHelperBase):
 
     @_api.delete_parameter(
         "3.9", "nth_coord", addendum="'nth_coord' is now inferred from 'loc'.")
-    def new_fixed_axis(self, loc,
-                       nth_coord=None,
-                       axis_direction=None,
-                       offset=None,
-                       axes=None,
-                       ):
+    def new_fixed_axis(
+            self, loc, nth_coord=None, axis_direction=None, offset=None, axes=None):
         if axes is None:
             _api.warn_external(
                 "'new_fixed_axis' explicitly requires the axes keyword.")
             axes = self.axes
         if axis_direction is None:
             axis_direction = loc
-        helper = FixedAxisArtistHelperRectilinear(axes, loc)
-        axisline = AxisArtist(axes, helper, offset=offset,
-                              axis_direction=axis_direction)
-        return axisline
+        return AxisArtist(axes, FixedAxisArtistHelperRectilinear(axes, loc),
+                          offset=offset, axis_direction=axis_direction)
 
-    def new_floating_axis(self, nth_coord, value,
-                          axis_direction="bottom",
-                          axes=None,
-                          ):
+    def new_floating_axis(self, nth_coord, value, axis_direction="bottom", axes=None):
         if axes is None:
             _api.warn_external(
                 "'new_floating_axis' explicitly requires the axes keyword.")
@@ -378,9 +356,7 @@ class GridHelperRectlinear(GridHelperBase):
                 locs.extend(self.axes.xaxis.major.locator())
             if which in ("both", "minor"):
                 locs.extend(self.axes.xaxis.minor.locator())
-
-            for x in locs:
-                gridlines.append([[x, x], [y1, y2]])
+            gridlines.extend([[x, x], [y1, y2]] for x in locs)
 
         if axis in ("both", "y"):
             x1, x2 = self.axes.get_xlim()
@@ -389,23 +365,16 @@ class GridHelperRectlinear(GridHelperBase):
                 locs.extend(self.axes.yaxis.major.locator())
             if self.axes.yaxis._minor_tick_kw["gridOn"]:
                 locs.extend(self.axes.yaxis.minor.locator())
-
-            for y in locs:
-                gridlines.append([[x1, x2], [y, y]])
+            gridlines.extend([[x1, x2], [y, y]] for y in locs)
 
         return gridlines
 
 
 class Axes(maxes.Axes):
 
-    @_api.deprecated("3.8", alternative="ax.axis")
-    def __call__(self, *args, **kwargs):
-        return maxes.Axes.axis(self.axes, *args, **kwargs)
-
     def __init__(self, *args, grid_helper=None, **kwargs):
         self._axisline_on = True
-        self._grid_helper = (grid_helper if grid_helper
-                             else GridHelperRectlinear(self))
+        self._grid_helper = grid_helper if grid_helper else GridHelperRectlinear(self)
         super().__init__(*args, **kwargs)
         self.toggle_axisline(True)
 

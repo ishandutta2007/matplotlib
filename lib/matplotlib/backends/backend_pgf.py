@@ -14,7 +14,7 @@ import weakref
 from PIL import Image
 
 import matplotlib as mpl
-from matplotlib import _api, cbook, font_manager as fm
+from matplotlib import cbook, font_manager as fm
 from matplotlib.backend_bases import (
     _Backend, FigureCanvasBase, FigureManagerBase, RendererBase
 )
@@ -23,9 +23,13 @@ from matplotlib.backends.backend_pdf import (
     _create_pdf_info_dict, _datetime_to_pdf)
 from matplotlib.path import Path
 from matplotlib.figure import Figure
+from matplotlib.font_manager import FontProperties
 from matplotlib._pylab_helpers import Gcf
 
 _log = logging.getLogger(__name__)
+
+
+_DOCUMENTCLASS = r"\documentclass{article}"
 
 
 # Note: When formatting floating point values, it is important to use the
@@ -34,17 +38,32 @@ _log = logging.getLogger(__name__)
 
 def _get_preamble():
     """Prepare a LaTeX preamble based on the rcParams configuration."""
+    font_size_pt = FontProperties(
+        size=mpl.rcParams["font.size"]
+    ).get_size_in_points()
     return "\n".join([
         # Remove Matplotlib's custom command \mathdefault.  (Not using
         # \mathnormal instead since this looks odd with Computer Modern.)
         r"\def\mathdefault#1{#1}",
         # Use displaystyle for all math.
         r"\everymath=\expandafter{\the\everymath\displaystyle}",
+        # Set up font sizes to match font.size setting.
+        # If present, use the KOMA package scrextend to adjust the standard
+        # LaTeX font commands (\tiny, ..., \normalsize, ..., \Huge) accordingly.
+        # Otherwise, only set \normalsize, manually.
+        r"\IfFileExists{scrextend.sty}{",
+        r"  \usepackage[fontsize=%fpt]{scrextend}" % font_size_pt,
+        r"}{",
+        r"  \renewcommand{\normalsize}{\fontsize{%f}{%f}\selectfont}"
+        % (font_size_pt, 1.2 * font_size_pt),
+        r"  \normalsize",
+        r"}",
         # Allow pgf.preamble to override the above definitions.
         mpl.rcParams["pgf.preamble"],
-        r"\ifdefined\pdftexversion\else  % non-pdftex case.",
-        r"  \usepackage{fontspec}",
         *([
+            r"\ifdefined\pdftexversion\else  % non-pdftex case.",
+            r"  \usepackage{fontspec}",
+        ] + [
             r"  \%s{%s}[Path=\detokenize{%s/}]"
             % (command, path.name, path.parent.as_posix())
             for command, path in zip(
@@ -52,8 +71,7 @@ def _get_preamble():
                 [pathlib.Path(fm.findfont(family))
                  for family in ["serif", "sans\\-serif", "monospace"]]
             )
-        ] if mpl.rcParams["pgf.rcfonts"] else []),
-        r"\fi",
+        ] + [r"\fi"] if mpl.rcParams["pgf.rcfonts"] else []),
         # Documented as "must come last".
         mpl.texmanager._usepackage_if_not_loaded("underscore", option="strings"),
     ])
@@ -94,6 +112,8 @@ def _escape_and_apply_props(s, prop):
     family = prop.get_family()[0]
     if family in families:
         commands.append(families[family])
+    elif not mpl.rcParams["pgf.rcfonts"]:
+        commands.append(r"\fontfamily{\familydefault}")
     elif any(font.name == family for font in fm.fontManager.ttflist):
         commands.append(
             r"\ifdefined\pdftexversion\else\setmainfont{%s}\rmfamily\fi" % family)
@@ -185,7 +205,7 @@ class LatexManager:
     @staticmethod
     def _build_latex_header():
         latex_header = [
-            r"\documentclass{article}",
+            _DOCUMENTCLASS,
             # Include TeX program name as a comment for cache invalidation.
             # TeX does not allow this to be the first line.
             rf"% !TeX program = {mpl.rcParams['pgf.texsystem']}",
@@ -257,7 +277,8 @@ class LatexManager:
         # Open LaTeX process for real work; register it for deletion.  On
         # Windows, we must ensure that the subprocess has quit before being
         # able to delete the tmpdir in which it runs; in order to do so, we
-        # must first `kill()` it, and then `communicate()` with it.
+        # must first `kill()` it, and then `communicate()` with or `wait()` on
+        # it.
         try:
             self.latex = subprocess.Popen(
                 [mpl.rcParams["pgf.texsystem"], "-halt-on-error"],
@@ -274,7 +295,10 @@ class LatexManager:
 
         def finalize_latex(latex):
             latex.kill()
-            latex.communicate()
+            try:
+                latex.communicate()
+            except RuntimeError:
+                latex.wait()
 
         self._finalize_latex = weakref.finalize(
             self, finalize_latex, self.latex)
@@ -810,7 +834,7 @@ class FigureCanvasPgf(FigureCanvasBase):
             self.print_pgf(tmppath / "figure.pgf", **kwargs)
             (tmppath / "figure.tex").write_text(
                 "\n".join([
-                    r"\documentclass[12pt]{article}",
+                    _DOCUMENTCLASS,
                     r"\usepackage[pdfinfo={%s}]{hyperref}" % pdfinfo,
                     r"\usepackage[papersize={%fin,%fin}, margin=0in]{geometry}"
                     % (w, h),
@@ -825,8 +849,8 @@ class FigureCanvasPgf(FigureCanvasBase):
             cbook._check_and_log_subprocess(
                 [texcommand, "-interaction=nonstopmode", "-halt-on-error",
                  "figure.tex"], _log, cwd=tmpdir)
-            with (tmppath / "figure.pdf").open("rb") as orig, \
-                 cbook.open_file_cm(fname_or_fh, "wb") as dest:
+            with ((tmppath / "figure.pdf").open("rb") as orig,
+                  cbook.open_file_cm(fname_or_fh, "wb") as dest):
                 shutil.copyfileobj(orig, dest)  # copy file contents to target
 
     def print_png(self, fname_or_fh, **kwargs):
@@ -838,8 +862,8 @@ class FigureCanvasPgf(FigureCanvasBase):
             png_path = tmppath / "figure.png"
             self.print_pdf(pdf_path, **kwargs)
             converter(pdf_path, png_path, dpi=self.figure.dpi)
-            with png_path.open("rb") as orig, \
-                 cbook.open_file_cm(fname_or_fh, "wb") as dest:
+            with (png_path.open("rb") as orig,
+                  cbook.open_file_cm(fname_or_fh, "wb") as dest):
                 shutil.copyfileobj(orig, dest)  # copy file contents to target
 
     def get_renderer(self):
@@ -874,9 +898,7 @@ class PdfPages:
     ...     pdf.savefig()
     """
 
-    _UNSET = object()
-
-    def __init__(self, filename, *, keep_empty=_UNSET, metadata=None):
+    def __init__(self, filename, *, metadata=None):
         """
         Create a new PdfPages object.
 
@@ -885,10 +907,6 @@ class PdfPages:
         filename : str or path-like
             Plots using `PdfPages.savefig` will be written to a file at this
             location. Any older file with the same name is overwritten.
-
-        keep_empty : bool, default: True
-            If set to False, then empty pdf files will be deleted automatically
-            when closed.
 
         metadata : dict, optional
             Information dictionary object (see PDF reference section 10.2.1
@@ -905,22 +923,15 @@ class PdfPages:
         """
         self._output_name = filename
         self._n_figures = 0
-        if keep_empty and keep_empty is not self._UNSET:
-            _api.warn_deprecated("3.8", message=(
-                "Keeping empty pdf files is deprecated since %(since)s and support "
-                "will be removed %(removal)s."))
-        self._keep_empty = keep_empty
         self._metadata = (metadata or {}).copy()
         self._info_dict = _create_pdf_info_dict('pgf', self._metadata)
         self._file = BytesIO()
-
-    keep_empty = _api.deprecate_privatize_attribute("3.8")
 
     def _write_header(self, width_inches, height_inches):
         pdfinfo = ','.join(
             _metadata_to_str(k, v) for k, v in self._info_dict.items())
         latex_header = "\n".join([
-            r"\documentclass[12pt]{article}",
+            _DOCUMENTCLASS,
             r"\usepackage[pdfinfo={%s}]{hyperref}" % pdfinfo,
             r"\usepackage[papersize={%fin,%fin}, margin=0in]{geometry}"
             % (width_inches, height_inches),
@@ -945,11 +956,6 @@ class PdfPages:
         self._file.write(rb'\end{document}\n')
         if self._n_figures > 0:
             self._run_latex()
-        elif self._keep_empty:
-            _api.warn_deprecated("3.8", message=(
-                "Keeping empty pdf files is deprecated since %(since)s and support "
-                "will be removed %(removal)s."))
-            open(self._output_name, 'wb').close()
         self._file.close()
 
     def _run_latex(self):
@@ -983,26 +989,21 @@ class PdfPages:
                 raise ValueError(f"No figure {figure}")
             figure = manager.canvas.figure
 
-        with cbook._setattr_cm(figure, canvas=FigureCanvasPgf(figure)):
-            width, height = figure.get_size_inches()
-            if self._n_figures == 0:
-                self._write_header(width, height)
-            else:
-                # \pdfpagewidth and \pdfpageheight exist on pdftex, xetex, and
-                # luatex<0.85; they were renamed to \pagewidth and \pageheight
-                # on luatex>=0.85.
-                self._file.write(
-                    (
-                        r'\newpage'
-                        r'\ifdefined\pdfpagewidth\pdfpagewidth'
-                        fr'\else\pagewidth\fi={width}in'
-                        r'\ifdefined\pdfpageheight\pdfpageheight'
-                        fr'\else\pageheight\fi={height}in'
-                        '%%\n'
-                    ).encode("ascii")
-                )
-            figure.savefig(self._file, format="pgf", **kwargs)
-            self._n_figures += 1
+        width, height = figure.get_size_inches()
+        if self._n_figures == 0:
+            self._write_header(width, height)
+        else:
+            # \pdfpagewidth and \pdfpageheight exist on pdftex, xetex, and
+            # luatex<0.85; they were renamed to \pagewidth and \pageheight
+            # on luatex>=0.85.
+            self._file.write(
+                rb'\newpage'
+                rb'\ifdefined\pdfpagewidth\pdfpagewidth\else\pagewidth\fi=%fin'
+                rb'\ifdefined\pdfpageheight\pdfpageheight\else\pageheight\fi=%fin'
+                b'%%\n' % (width, height)
+            )
+        figure.savefig(self._file, format="pgf", backend="pgf", **kwargs)
+        self._n_figures += 1
 
     def get_pagecount(self):
         """Return the current number of pages in the multipage pdf file."""

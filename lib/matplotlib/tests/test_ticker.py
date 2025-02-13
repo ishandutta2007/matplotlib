@@ -3,6 +3,7 @@ import itertools
 import locale
 import logging
 import re
+from packaging.version import parse as parse_version
 
 import numpy as np
 from numpy.testing import assert_almost_equal, assert_array_equal
@@ -128,6 +129,14 @@ class TestMultipleLocator:
         with mpl.rc_context({'axes.autolimit_mode': 'round_numbers'}):
             loc = mticker.MultipleLocator(base=3.147, offset=1.3)
             assert_almost_equal(loc.view_limits(-4, 4), (-4.994, 4.447))
+
+    def test_view_limits_single_bin(self):
+        """
+        Test that 'round_numbers' works properly with a single bin.
+        """
+        with mpl.rc_context({'axes.autolimit_mode': 'round_numbers'}):
+            loc = mticker.MaxNLocator(nbins=1)
+            assert_almost_equal(loc.view_limits(-2.3, 2.3), (-4, 4))
 
     def test_set_params(self):
         """
@@ -334,7 +343,7 @@ class TestLogLocator:
 
     def test_polar_axes(self):
         """
-        Polar axes have a different ticking logic.
+        Polar Axes have a different ticking logic.
         """
         fig, ax = plt.subplots(subplot_kw={'projection': 'polar'})
         ax.set_yscale('log')
@@ -353,15 +362,12 @@ class TestLogLocator:
     def test_set_params(self):
         """
         Create log locator with default value, base=10.0, subs=[1.0],
-        numdecs=4, numticks=15 and change it to something else.
+        numticks=15 and change it to something else.
         See if change was successful. Should not raise exception.
         """
         loc = mticker.LogLocator()
-        with pytest.warns(mpl.MatplotlibDeprecationWarning, match="numdecs"):
-            loc.set_params(numticks=7, numdecs=8, subs=[2.0], base=4)
+        loc.set_params(numticks=7, subs=[2.0], base=4)
         assert loc.numticks == 7
-        with pytest.warns(mpl.MatplotlibDeprecationWarning, match="numdecs"):
-            assert loc.numdecs == 8
         assert loc._base == 4
         assert list(loc._subs) == [2.0]
 
@@ -628,7 +634,7 @@ class TestSymmetricalLogLocator:
         sym = mticker.SymmetricalLogLocator(base=10, linthresh=1, subs=[2.0, 4.0])
         sym.create_dummy_axis()
         sym.axis.set_view_interval(-10, 10)
-        assert (sym() == [-20., -40.,  -2.,  -4.,   0.,   2.,   4.,  20.,  40.]).all()
+        assert_array_equal(sym(), [-20, -40, -2, -4, 0, 2, 4, 20, 40])
 
     def test_extending(self):
         sym = mticker.SymmetricalLogLocator(base=10, linthresh=1)
@@ -853,6 +859,22 @@ class TestScalarFormatter:
         assert not tmp_form.get_useOffset()
         assert tmp_form.offset == 0.5
 
+    def test_set_use_offset_bool(self):
+        tmp_form = mticker.ScalarFormatter()
+        tmp_form.set_useOffset(True)
+        assert tmp_form.get_useOffset()
+        assert tmp_form.offset == 0
+
+        tmp_form.set_useOffset(False)
+        assert not tmp_form.get_useOffset()
+        assert tmp_form.offset == 0
+
+    def test_set_use_offset_int(self):
+        tmp_form = mticker.ScalarFormatter()
+        tmp_form.set_useOffset(1)
+        assert not tmp_form.get_useOffset()
+        assert tmp_form.offset == 1
+
     def test_use_locale(self):
         conv = locale.localeconv()
         sep = conv['thousands_sep']
@@ -914,10 +936,17 @@ class TestScalarFormatter:
             'axes.formatter.use_mathtext': False
         })
 
-        with pytest.warns(UserWarning, match='cmr10 font should ideally'):
-            fig, ax = plt.subplots()
-            ax.set_xticks([-1, 0, 1])
-            fig.canvas.draw()
+        if parse_version(pytest.__version__).major < 8:
+            with pytest.warns(UserWarning, match='cmr10 font should ideally'):
+                fig, ax = plt.subplots()
+                ax.set_xticks([-1, 0, 1])
+                fig.canvas.draw()
+        else:
+            with (pytest.warns(UserWarning, match="Glyph 8722"),
+                  pytest.warns(UserWarning, match='cmr10 font should ideally')):
+                fig, ax = plt.subplots()
+                ax.set_xticks([-1, 0, 1])
+                fig.canvas.draw()
 
     def test_cmr10_substitutions(self, caplog):
         mpl.rcParams.update({
@@ -1169,11 +1198,11 @@ class TestLogFormatter:
         assert label == expected
 
     @pytest.mark.parametrize('value, long, short', [
-        (0.0, "0", "0           "),
-        (0, "0", "0           "),
-        (-1.0, "-10^0", "-1          "),
-        (2e-10, "2x10^-10", "2e-10       "),
-        (1e10, "10^10", "1e+10       "),
+        (0.0, "0", "0"),
+        (0, "0", "0"),
+        (-1.0, "-10^0", "-1"),
+        (2e-10, "2x10^-10", "2e-10"),
+        (1e10, "10^10", "1e+10"),
     ])
     def test_format_data(self, value, long, short):
         fig, ax = plt.subplots()
@@ -1222,11 +1251,16 @@ class TestLogFormatter:
         ax.set_xlim(1, 80)
         self._sub_labels(ax.xaxis, subs=[])
 
-        # axis range at 0.4 to 1 decades, label subs 2, 3, 4, 6
+        # axis range slightly more than 1 decade, but spanning a single major
+        # tick, label subs 2, 3, 4, 6
+        ax.set_xlim(.8, 9)
+        self._sub_labels(ax.xaxis, subs=[2, 3, 4, 6])
+
+        # axis range at 0.4 to 1 decade, label subs 2, 3, 4, 6
         ax.set_xlim(1, 8)
         self._sub_labels(ax.xaxis, subs=[2, 3, 4, 6])
 
-        # axis range at 0 to 0.4 decades, label all
+        # axis range at 0 to 0.4 decade, label all
         ax.set_xlim(0.5, 0.9)
         self._sub_labels(ax.xaxis, subs=np.arange(2, 10, dtype=int))
 
@@ -1434,14 +1468,21 @@ class TestFormatStrFormatter:
 
 class TestStrMethodFormatter:
     test_data = [
-        ('{x:05d}', (2,), '00002'),
-        ('{x:03d}-{pos:02d}', (2, 1), '002-01'),
+        ('{x:05d}', (2,), False, '00002'),
+        ('{x:05d}', (2,), True, '00002'),
+        ('{x:05d}', (-2,), False, '-0002'),
+        ('{x:05d}', (-2,), True, '\N{MINUS SIGN}0002'),
+        ('{x:03d}-{pos:02d}', (2, 1), False, '002-01'),
+        ('{x:03d}-{pos:02d}', (2, 1), True, '002-01'),
+        ('{x:03d}-{pos:02d}', (-2, 1), False, '-02-01'),
+        ('{x:03d}-{pos:02d}', (-2, 1), True, '\N{MINUS SIGN}02-01'),
     ]
 
-    @pytest.mark.parametrize('format, input, expected', test_data)
-    def test_basic(self, format, input, expected):
-        fmt = mticker.StrMethodFormatter(format)
-        assert fmt(*input) == expected
+    @pytest.mark.parametrize('format, input, unicode_minus, expected', test_data)
+    def test_basic(self, format, input, unicode_minus, expected):
+        with mpl.rc_context({"axes.unicode_minus": unicode_minus}):
+            fmt = mticker.StrMethodFormatter(format)
+            assert fmt(*input) == expected
 
 
 class TestEngFormatter:
@@ -1569,6 +1610,73 @@ def test_engformatter_usetex_useMathText():
         # Checking if the dollar `$` signs have been inserted around numbers
         # in tick labels.
         assert x_tick_label_text == ['$0$', '$500$', '$1$ k']
+
+
+@pytest.mark.parametrize(
+    'data_offset, noise, oom_center_desired, oom_noise_desired', [
+        (271_490_000_000.0,    10,         9,  0),
+        (27_149_000_000_000.0, 10_000_000, 12, 6),
+        (27.149,               0.01,       0, -3),
+        (2_714.9,              0.01,       3, -3),
+        (271_490.0,            0.001,      3, -3),
+        (271.49,               0.001,      0, -3),
+        # The following sets of parameters demonstrates that when
+        # oom(data_offset)-1 and oom(noise)-2 equal a standard 3*N oom, we get
+        # that oom_noise_desired < oom(noise)
+        (27_149_000_000.0,     100,        9, +3),
+        (27.149,               1e-07,      0, -6),
+        (271.49,               0.0001,     0, -3),
+        (27.149,               0.0001,     0, -3),
+        # Tests where oom(data_offset) <= oom(noise), those are probably
+        # covered by the part where formatter.offset != 0
+        (27_149.0,             10_000,     0, 3),
+        (27.149,               10_000,     0, 3),
+        (27.149,               1_000,      0, 3),
+        (27.149,               100,        0, 0),
+        (27.149,               10,         0, 0),
+    ]
+)
+def test_engformatter_offset_oom(
+    data_offset,
+    noise,
+    oom_center_desired,
+    oom_noise_desired
+):
+    UNIT = "eV"
+    fig, ax = plt.subplots()
+    ydata = data_offset + np.arange(-5, 7, dtype=float)*noise
+    ax.plot(ydata)
+    formatter = mticker.EngFormatter(useOffset=True, unit=UNIT)
+    # So that offset strings will always have the same size
+    formatter.ENG_PREFIXES[0] = "_"
+    ax.yaxis.set_major_formatter(formatter)
+    fig.canvas.draw()
+    offset_got = formatter.get_offset()
+    ticks_got = [labl.get_text() for labl in ax.get_yticklabels()]
+    # Predicting whether offset should be 0 or not is essentially testing
+    # ScalarFormatter._compute_offset . This function is pretty complex and it
+    # would be nice to test it, but this is out of scope for this test which
+    # only makes sure that offset text and the ticks gets the correct unit
+    # prefixes and the ticks.
+    if formatter.offset:
+        prefix_noise_got = offset_got[2]
+        prefix_noise_desired = formatter.ENG_PREFIXES[oom_noise_desired]
+        prefix_center_got = offset_got[-1-len(UNIT)]
+        prefix_center_desired = formatter.ENG_PREFIXES[oom_center_desired]
+        assert prefix_noise_desired == prefix_noise_got
+        assert prefix_center_desired == prefix_center_got
+        # Make sure the ticks didn't get the UNIT
+        for tick in ticks_got:
+            assert UNIT not in tick
+    else:
+        assert oom_center_desired == 0
+        assert offset_got == ""
+        # Make sure the ticks contain now the prefixes
+        for tick in ticks_got:
+            # 0 is zero on all orders of magnitudes, no matter what is
+            # oom_noise_desired
+            prefix_idx = 0 if tick[0] == "0" else oom_noise_desired
+            assert tick.endswith(formatter.ENG_PREFIXES[prefix_idx] + UNIT)
 
 
 class TestPercentFormatter:
@@ -1719,6 +1827,46 @@ def test_minorticks_rc():
     minorticksubplot(True, True, 4)
 
 
+def test_minorticks_toggle():
+    """
+    Test toggling minor ticks
+
+    Test `.Axis.minorticks_on()` and `.Axis.minorticks_off()`. Testing is
+    limited to a subset of built-in scales - `'linear'`, `'log'`, `'asinh'`
+    and `'logit'`. `symlog` scale does not seem to have a working minor
+    locator and is omitted. In future, this test should cover all scales in
+    `matplotlib.scale.get_scale_names()`.
+    """
+    fig = plt.figure()
+    def minortickstoggle(xminor, yminor, scale, i):
+        ax = fig.add_subplot(2, 2, i)
+        ax.set_xscale(scale)
+        ax.set_yscale(scale)
+        if not xminor and not yminor:
+            ax.minorticks_off()
+        if xminor and not yminor:
+            ax.xaxis.minorticks_on()
+            ax.yaxis.minorticks_off()
+        if not xminor and yminor:
+            ax.xaxis.minorticks_off()
+            ax.yaxis.minorticks_on()
+        if xminor and yminor:
+            ax.minorticks_on()
+
+        assert (len(ax.xaxis.get_minor_ticks()) > 0) == xminor
+        assert (len(ax.yaxis.get_minor_ticks()) > 0) == yminor
+
+    scales = ['linear', 'log', 'asinh', 'logit']
+    for scale in scales:
+        minortickstoggle(False, False, scale, 1)
+        minortickstoggle(True, False, scale, 2)
+        minortickstoggle(False, True, scale, 3)
+        minortickstoggle(True, True, scale, 4)
+        fig.clear()
+
+    plt.close(fig)
+
+
 @pytest.mark.parametrize('remove_overlapping_locs, expected_num',
                          ((True, 6),
                           (None, 6),  # this tests the default
@@ -1789,3 +1937,24 @@ def test_set_offset_string(formatter):
     assert formatter.get_offset() == ''
     formatter.set_offset_string('mpl')
     assert formatter.get_offset() == 'mpl'
+
+
+def test_minorticks_on_multi_fig():
+    """
+    Turning on minor gridlines in a multi-Axes Figure
+    that contains more than one boxplot and shares the x-axis
+    should not raise an exception.
+    """
+    fig, ax = plt.subplots()
+
+    ax.boxplot(np.arange(10), positions=[0])
+    ax.boxplot(np.arange(10), positions=[0])
+    ax.boxplot(np.arange(10), positions=[1])
+
+    ax.grid(which="major")
+    ax.grid(which="minor")
+    ax.minorticks_on()
+    fig.draw_without_rendering()
+
+    assert ax.get_xgridlines()
+    assert isinstance(ax.xaxis.get_minor_locator(), mpl.ticker.AutoMinorLocator)

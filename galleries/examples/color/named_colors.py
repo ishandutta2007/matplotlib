@@ -3,7 +3,7 @@
 List of named colors
 ====================
 
-This plots a list of the named colors supported in matplotlib.
+This plots a list of the named colors supported by Matplotlib.
 For more information on colors in matplotlib see
 
 * the :ref:`colors_def` tutorial;
@@ -121,3 +121,8 @@ plt.show()
 #    - `matplotlib.figure.Figure.subplots_adjust`
 #    - `matplotlib.axes.Axes.text`
 #    - `matplotlib.patches.Rectangle`
+#
+# .. tags::
+#
+#    styling: color
+#    purpose: reference
